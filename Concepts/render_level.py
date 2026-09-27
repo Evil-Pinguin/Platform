@@ -26,6 +26,15 @@ PNG = {
     'b017c5b7638bea95aacc23fe69524e10': 'Assets/Art/Environment/Decor/rocks.png',
     '5c2806664d4ba3f3f50b3741002bf34e': 'Assets/Art/Environment/Decor/grass_tuft.png',
     'dfefd0bca0374f584c131084affd95aa': 'Assets/Art/Environment/Decor/serge_pole.png',
+    '76322453d221141f89f1cbb255c6d91f': 'Assets/Art/Environment/flower_lily.png',
+    '6abdb613866b23b9b4e3eb024b21c8fd': 'Assets/Art/Environment/flower_lilies.png',
+    'dd7b4a1d458ab880b373f467639af009': 'Assets/Art/Environment/flower_iris.png',
+    '16e75b7cffae3121ece545242bee023b': 'Assets/Art/Environment/flower_campion.png',
+    '8252fdaaf1543cb289b74cb3e8b5e17b': 'Assets/Art/Environment/tree_larch.png',
+    'd0d17ec449fc6f2b17e3769108b6432c': 'Assets/Art/Environment/tree_birch.png',
+    'b104a11421e6377350e663afdf1bcb1b': 'Assets/Art/Environment/tree_cluster.png',
+    '33fe94647fdf3869ad5cd73fc249316d': 'Assets/Art/Environment/pillar.png',
+    'c46dd459691fd1dd598775d241a19a84': 'Assets/Art/Heroine/Walk/walk_2.png',
 }
 HERO = '7a2d62ffd4fe461990b64ffe293dc930'   # walk_1
 
