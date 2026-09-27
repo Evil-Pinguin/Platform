@@ -588,7 +588,6 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 97fcaa228c8648e0a1b563d43e3bcd7f, type: 3}
   walkFps: 12
   idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}
-  idleFrontSprite: {fileID: 21300000, guid: 030157201a9f4746918c6b2df8c6964b, type: 3}
   respawnBelowY: -15
 --- !u!1 &500000001
 GameObject:
