@@ -283,16 +283,25 @@ public class PlayerController : MonoBehaviour
         abilityReady[s] = abilityCooldowns[s];
     }
 
+    // Из всего, что попало в зону, оставляем только цели. Свои же
+    // коллайдеры пропускаем: иначе удар задевает героиню саму.
+    Damageable TargetIn(Collider2D h)
+    {
+        if (h.attachedRigidbody == body)
+            return null;
+        Damageable target = h.GetComponent<Damageable>()
+                         ?? h.GetComponentInParent<Damageable>();
+        return target != null && target.IsAlive ? target : null;
+    }
+
     void HitAround(Vector2 centre, float radius, int damage)
     {
         Collider2D[] hits = Physics2D.OverlapCircleAll(centre, radius);
         foreach (Collider2D h in hits)
         {
-            Damageable target = h.GetComponent<Damageable>()
-                             ?? h.GetComponentInParent<Damageable>();
-            if (target == null || !target.IsAlive)
-                continue;
-            target.TakeHit(damage, centre);
+            Damageable target = TargetIn(h);
+            if (target != null)
+                target.TakeHit(damage, centre);
         }
     }
 
@@ -303,11 +312,9 @@ public class PlayerController : MonoBehaviour
             transform.position, new Vector2(shockRange * 2f, 0.8f), 0f);
         foreach (Collider2D h in hits)
         {
-            Damageable target = h.GetComponent<Damageable>()
-                             ?? h.GetComponentInParent<Damageable>();
-            if (target == null || !target.IsAlive)
-                continue;
-            target.TakeHit(1, transform.position);
+            Damageable target = TargetIn(h);
+            if (target != null)
+                target.TakeHit(1, transform.position);
         }
     }
 
@@ -321,11 +328,8 @@ public class PlayerController : MonoBehaviour
             new Vector2(1.8f, 1.6f), 0f);
         foreach (Collider2D h in hits)
         {
-            Damageable target = h.GetComponent<Damageable>()
-                             ?? h.GetComponentInParent<Damageable>();
-            if (target == null || !target.IsAlive)
-                continue;
-            if (hitThisDash.Add(target))
+            Damageable target = TargetIn(h);
+            if (target != null && hitThisDash.Add(target))
                 target.TakeHit(dashHit, transform.position);
         }
     }
@@ -349,11 +353,8 @@ public class PlayerController : MonoBehaviour
         Collider2D[] hits = Physics2D.OverlapBoxAll(centre, hitboxSize, 0f);
         foreach (Collider2D h in hits)
         {
-            Damageable target = h.GetComponent<Damageable>()
-                             ?? h.GetComponentInParent<Damageable>();
-            if (target == null || target == this || !target.IsAlive)
-                continue;
-            if (hitThisSwing.Add(target))
+            Damageable target = TargetIn(h);
+            if (target != null && hitThisSwing.Add(target))
                 target.TakeHit(attackDamage, transform.position);
         }
     }
