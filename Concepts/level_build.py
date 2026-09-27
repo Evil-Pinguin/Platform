@@ -20,6 +20,8 @@ SCENE = 'Assets/Scenes/TestLevel.unity'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
 BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
+DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
+SERGE_GUID = 'dfefd0bca0374f584c131084affd95aa'
 DECOR = {
     'spruce': ('acd1ec0f7dd66712a76a7f4aa03de836', 299, 775, 256),
     'rocks': ('b017c5b7638bea95aacc23fe69524e10', 348, 298, 384),
@@ -171,6 +173,14 @@ if not check():
     raise SystemExit('уровень непроходим — исправь таблицу выше')
 
 
+# --- мишени: имя, x, высота земли, сколько ударов выдерживает ----------
+# Коллайдер сплошной: чтобы пройти, нужно или ударить, или перепрыгнуть.
+DUMMIES = [
+    ('Dummy_1', -26.0, 0.0, 5),
+    ('Dummy_2',  -4.0, 2.4, 3),
+    ('Dummy_3',  17.0, 0.0, 2),
+]
+
 # --- декор: вид, x, отражение ---------------------------------------
 DECOR_ITEMS = [
     ('spruce', -29.0, 0), ('spruce', -24.0, 1), ('spruce', -20.5, 0),
@@ -197,6 +207,24 @@ DECOR_ITEMS = [
 ]
 
 
+def dummy(gid, name, x, top, health, order):
+    """Резной столб-мишень: спрайт сергэ, сплошной коллайдер, Damageable."""
+    guid, pw, ph, ppu = DECOR['serge_pole']
+    w, h = round(pw / ppu, 4), round(ph / ppu, 4)
+    out = [gameobject(gid, name, [gid+1, gid+2, gid+3], order)]
+    out.append(transform(gid+1, gid, (x, top, -0.4), order))
+    out.append(sprite(gid+2, gid, guid, 1, (w, h), 0))
+    out.append(box(gid+3, gid, (0, h/2), (0.5, h)))
+    out.append(f"--- !u!114 &{gid+4}\nMonoBehaviour:\n" + COMMON_HEAD +
+               f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
+               "  m_EditorHideFlags: 0\n"
+               f"  m_Script: {{fileID: 11500000, guid: {DAMAGEABLE_GUID}, type: 3}}\n"
+               "  m_Name: \n  m_EditorClassIdentifier: \n"
+               f"  health: {health}\n  knockback: 2.5\n  flashTime: 0.15\n"
+               "  vanishOnDeath: 1\n")
+    return out
+
+
 def ground_top_at(x):
     for _, x0, x1, top in GROUND:
         if x0 - 0.01 <= x <= x1 + 0.01:
@@ -208,7 +236,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24'):
+for prefix in ('21', '22', '23', '24', '25'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -263,6 +291,10 @@ for i, (kind, x, flip) in enumerate(DECOR_ITEMS):
     order += 1
     placed += 1
 
+for i, (name, x, top, health) in enumerate(DUMMIES):
+    blocks += dummy(250000000 + i * 10, name, x, top, health, order)
+    order += 1
+
 s = s.rstrip('\n') + '\n' + '\n'.join(blocks)
 
 # --- героиня на старте поляны
@@ -293,6 +325,9 @@ assert n == 1, f'followY: {n}'
 # 12 fps давали цикл 0.67 с, то есть 1.78 роста пути за цикл: ноги
 # переступали вдвое реже, чем шёл корпус, и это читалось как скольжение.
 # Четыре кадра на тех же 12 fps дают 0.33 с ~= 0.9 роста — почти натура.
+ATTACK = ['dc1783b3a5c9607e12c781b8f88ebef7',   # замах
+          'e58d2f83e7543184b89c6ebf520dc6f6',   # выпад с ножом
+          'be4bc24d2bc77d76f96772ae3e2efa11']   # возврат
 frames = '\n'.join(
     f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in
     ['7a2d62ffd4fe461990b64ffe293dc930',   # walk_1 — контакт
@@ -309,6 +344,12 @@ s, n = re.subn(
         '  walkFrames:\n' + frames + '\n'
         '  walkFps: 12\n'
         '  idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}\n'
+        '  attackFrames:\n' + '\n'.join(
+            f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in ATTACK) + '\n'
+        '  attackDuration: 0.32\n  attackCooldown: 0.1\n'
+        '  attackMoveScale: 0.35\n  attackDamage: 1\n'
+        '  hitboxCenterX: 0.85\n  hitboxCenterY: 0.95\n'
+        '  hitboxSize: {x: 1.3, y: 1.2}\n  hitWindow: {x: 0.3, y: 0.7}\n'
         '  respawnBelowY: -12\n'),
     s, flags=re.S)
 assert n == 1, f'PlayerController: {n}'
