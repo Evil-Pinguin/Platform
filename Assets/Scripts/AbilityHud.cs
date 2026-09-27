@@ -33,8 +33,6 @@ public class AbilityHud : MonoBehaviour
                   "1…5 — выбрать способность,   F — применить,   J или мышь — удар",
                   hint);
 
-        DrawStamina();
-
         for (int i = 0; i < 5; i++)
         {
             var rect = new Rect(x, y + i * (h + 4f * scale), w, h);
@@ -64,38 +62,6 @@ public class AbilityHud : MonoBehaviour
                       + (spent ? "  " + ready.ToString("0.0") + "с" : ""),
                       style);
         }
-    }
-
-    // Полоска стамины под панелью способностей. Серая — не успела
-    // дождаться, красная — кончилась, голубая — бежит.
-    void DrawStamina()
-    {
-        if (pc == null)
-            return;
-        if (box == null)
-            MakeStyles();
-
-        float w = 190f * scale;
-        float h = 12f * scale;
-        float x = 16f * scale;
-        float y = Screen.height - 24f * scale;
-
-        float fill = Mathf.Clamp01(pc.stamina);
-        var rect = new Rect(x, y, w, h);
-
-        GUI.DrawTexture(rect, Texture2D.whiteTexture, ScaleMode.StretchToFill,
-                        false, 0f, new Color(0f, 0f, 0f, 0.55f), 0f, 0f);
-
-        var fillRect = new Rect(rect.x + 2f, rect.y + 2f,
-                                Mathf.Max(0f, (rect.width - 4f) * fill), rect.height - 4f);
-        Color tint = pc.sprinting ? new Color(0.62f, 0.88f, 1f)
-                  : fill <= pc.sprintRestartAt + 0.01f ? new Color(1f, 0.45f, 0.35f)
-                  : new Color(0.75f, 0.82f, 0.9f);
-        GUI.DrawTexture(fillRect, Texture2D.whiteTexture, ScaleMode.StretchToFill,
-                        false, 0f, tint, 0f, 0f);
-
-        GUI.Label(new Rect(x + 6f, y - 2f, 200f, h + 4f),
-                  "Shift — спринт", hint);
     }
 
     void MakeStyles()

@@ -11,23 +11,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Насколько быстро она разгоняется и тормозит")]
     public float acceleration = 70f;
 
-    [Header("Спринт со стаминой")]
-    [Tooltip("Во сколько раз спринт быстрее ходьбы")]
-    public float sprintMultiplier = 1.7f;
-    [Tooltip("Сколько держит полная стамина, секунды")]
-    public float sprintDuration = 3.2f;
-    [Tooltip("Сколько стоит полная стамина при отдыхе, секунды")]
-    public float staminaRecoverTime = 6f;
-    [Tooltip("Сколько разгон при спринте быстрее разгона при ходьбе")]
-    public float sprintAccelerationBonus = 1.6f;
-    [Tooltip("Доля стамины, до которой надо дождаться, чтобы снова побежать")]
-    [Range(0f, 1f)]
-    public float sprintRestartAt = 0.3f;
-    [Tooltip("Насколько сбивается прицел при спринте, 0 — ровно")]
-    public float sprintRecoil = 0.25f;
-    [Tooltip("Сколько секунд нельзя начинать спринт после приземления с рывком")]
-    public float sprintLockAfterLand = 0.18f;
-
     [Header("Прыжок")]
     [Tooltip("На какую высоту прыгает от пола, в юнитах")]
     public float jumpHeight = 2.2f;
@@ -109,11 +92,6 @@ public class PlayerController : MonoBehaviour
     bool grounded;
     bool airJumpUsed;
     bool slamPending;
-    float sprintBlockUntil = -99f;
-    bool sprintExhausted;
-    public float stamina = 1f;
-    public bool sprinting { get; private set; }
-
     float dashTimer;
     float dashDir = 1f;
     int dashHit;
@@ -156,10 +134,7 @@ public class PlayerController : MonoBehaviour
         ReadAttackInput();
         ReadAbilityInput();
 
-        bool wantsSprint = ReadSprint(move, attacking);
-        float speed = attacking
-                    ? moveSpeed * attackMoveScale
-                    : moveSpeed * (wantsSprint ? sprintMultiplier : 1f);
+        float speed = attacking ? moveSpeed * attackMoveScale : moveSpeed;
         float vx = body.velocity.x;
 
         float vy = body.velocity.y;
@@ -174,19 +149,8 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            float accel = acceleration;
-            if (wantsSprint)
-                accel *= sprintAccelerationBonus;
-            vx = Mathf.MoveTowards(vx, move * speed, accel * Time.deltaTime);
+            vx = Mathf.MoveTowards(vx, move * speed, acceleration * Time.deltaTime);
         }
-
-        if (sprinting && fx != null)
-            fx.SprintDust(Time.deltaTime);
-
-        // короткий отскок назад в момент старта, чтобы спринт читался
-        if (wantsSprint && !sprinting)
-            vx -= Mathf.Sign(vx) * speed * sprintRecoil;
-        sprinting = wantsSprint;
 
         body.velocity = new Vector2(vx, vy);
 
@@ -210,31 +174,6 @@ public class PlayerController : MonoBehaviour
         Animate(move);
         UpdateAttackHit();
         RespawnIfFallen();
-    }
-
-    // Спринт со стаминой. Держится, пока есть запас и игрок реально
-    // жмёт в сторону; в воздухе и во время удара не работает. Кончился —
-    // ждём, пока наберётся sprintRestartAt, иначе можно было бы
-    // дёргать спринт на кадр и бежать вечно.
-    bool ReadSprint(float move, bool isAttacking)
-    {
-        bool held = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-        bool onGround = grounded && !isAttacking && Mathf.Abs(move) > 0.01f
-                     && dashTimer <= 0f && Time.time >= sprintBlockUntil;
-
-        if (stamina >= sprintRestartAt)
-            sprintExhausted = false;
-        else
-            sprintExhausted = true;
-
-        if (onGround && held && !sprintExhausted)
-        {
-            stamina = Mathf.Max(0f, stamina - Time.deltaTime / Mathf.Max(0.01f, sprintDuration));
-            return true;
-        }
-
-        stamina = Mathf.Min(1f, stamina + Time.deltaTime / Mathf.Max(0.01f, staminaRecoverTime));
-        return false;
     }
 
     // Луч вниз из под центра: стоим ли мы на чём-то сейчас
@@ -519,8 +458,5 @@ public class PlayerController : MonoBehaviour
         shownFrame = -1;
         dashTimer = 0f;
         slamPending = false;
-        stamina = 0f;
-        sprintExhausted = true;
-        sprintBlockUntil = Time.time + 1.5f;
     }
 }
