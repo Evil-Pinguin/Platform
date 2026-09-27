@@ -23,6 +23,8 @@ BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
 FX_GO, FX_TR, FX_SCRIPT = 440000001, 440000002, 440000003
 AMB_GO, AMB_TR, AMB_SCRIPT = 450000001, 450000002, 450000003
+PARALLAX_GUID = '16471e47b8e5d5aa9ad83d7b78562c9c'
+TREE_GO, TREE_TR, TREE_SCRIPT = 460000001, 460000002, 460000003
 TRAIL_GO, TRAIL_TR, TRAIL_REND = 430000001, 430000002, 430000003
 HUD_GO, HUD_TR, HUD_SCRIPT_ID = 420000001, 420000002, 420000003
 DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
@@ -32,6 +34,13 @@ DECOR = {
     'rocks': ('b017c5b7638bea95aacc23fe69524e10', 348, 298, 384),
     'grass_tuft': ('5c2806664d4ba3f3f50b3741002bf34e', 309, 151, 256),
     'serge_pole': ('dfefd0bca0374f584c131084affd95aa', 161, 623, 256),
+}
+
+DECOR_TREE = {
+    'larch': ('8252fdaaf1543cb289b74cb3e8b5e17b', 359, 742, 180),
+    'birch': ('d0d17ec449fc6f2b17e3769108b6432c', 360, 745, 180),
+    'cluster': ('b104a11421e6377350e663afdf1bcb1b', 497, 709, 160),
+    'pillar': ('33fe94647fdf3869ad5cd73fc249316d', 322, 1138, 200),
 }
 
 GROUND_H = 2.933594      # спрайт земли при PPU 256
@@ -272,6 +281,19 @@ def dummy(gid, name, x, top, health, order):
     return out
 
 
+# Деревья среднего плана. Стоят на земле, но рисуются за ней, поэтому
+# низ стволов уходит под плиты — читается как роща за обрывом.
+TREES = [
+    # (вид, x, отражение, множитель высоты)
+    ('larch', -31.0, 0, 1.15), ('birch', -30.0, 0, 1.0), ('cluster', -27.0, 1, 0.95),
+    ('larch', -21.5, 1, 1.25), ('birch', -16.0, 0, 1.1), ('pillar', -11.0, 0, 0.8),
+    ('cluster', -6.0, 0, 1.0), ('larch', -1.5, 0, 1.3), ('birch', 3.0, 1, 0.95),
+    ('pillar', 9.0, 0, 0.95), ('larch', 14.0, 0, 1.1), ('cluster', 19.0, 1, 1.05),
+    ('birch', 24.0, 0, 1.2), ('larch', 29.5, 1, 1.0), ('cluster', 34.0, 0, 1.15),
+    ('birch', 39.0, 0, 1.05), ('pillar', 43.0, 0, 0.85),
+]
+
+
 def ground_top_at(x):
     for _, x0, x1, top in GROUND:
         if x0 - 0.01 <= x <= x1 + 0.01:
@@ -283,7 +305,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45'):
+for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45', '46'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -341,6 +363,25 @@ for i, (kind, x, flip) in enumerate(DECOR_ITEMS):
 for i, (name, x, top, health) in enumerate(DUMMIES):
     blocks += dummy(250000000 + i * 10, name, x, top, health, order)
     order += 1
+
+# --- средний план: роща едет медленнее земли, но быстрее неба
+blocks.append(gameobject(TREE_GO, 'TreeLine', [TREE_TR, TREE_SCRIPT], 0))
+blocks.append(transform(TREE_TR, TREE_GO, (0, 0, -0.5), 99))
+blocks.append(script(TREE_SCRIPT, TREE_GO, PARALLAX_GUID,
+                     '  factorX: 0.55\n  factorY: 1\n'))
+
+for i, (kind, x, flip, scale) in enumerate(TREES):
+    guid, pw, ph, ppu = DECOR_TREE[kind]
+    w, h = round(pw / ppu * scale, 4), round(ph / ppu * scale, 4)
+    gid = 461000000 + i * 10
+    # Над пропастью земли нет — дерево ставим на общий нулевой уровень.
+    # Оно за землёй, так что в разрыв видно именно дальний план.
+    top = ground_top_at(x)
+    if top is None:
+        top = 0.0
+    blocks.append(gameobject(gid, f'Tree_{kind}_{i:02d}', [gid + 1, gid + 2], -1))
+    blocks.append(transform(gid + 1, gid, (x, top, -0.5), -1, father=TREE_TR))
+    blocks.append(sprite(gid + 2, gid, guid, -1, (w, h), 0, flip))
 
 # --- лента ветра: дочерний объект героини, тянется только на рывке
 blocks.append(gameobject(TRAIL_GO, 'DashTrail', [TRAIL_TR, TRAIL_REND], 0))
@@ -451,7 +492,7 @@ def scene_roots(text):
             continue
         if re.search(r'm_Father: \{fileID: 0\}', b) is None:
             continue
-        roots.append((int(re.search(r'm_RootOrder: (\d+)', b).group(1)),
+        roots.append((int(re.search(r'm_RootOrder: (-?\d+)', b).group(1)),
                       re.search(r'm_GameObject: \{fileID: (\d+)\}', b).group(1)))
     roots.sort()
     globals()['roots_built'] = len(roots)
