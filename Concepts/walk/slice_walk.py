@@ -21,7 +21,7 @@ import subprocess
 import hashlib
 from collections import deque
 
-SHEET = 'Concepts/walk/walk_sheet_v9a.png'
+SHEET = 'Concepts/walk/walk_sheet_v10b.png'
 OUT_DIR = 'Assets/Art/Heroine/Walk'
 CANVAS_W, CANVAS_H = 330, 512
 WALK_PIVOT_PX = 165      # пивот прежних кадров: ровно середина холста

@@ -1,17 +1,19 @@
 """Режет лист прыжка на 2 кадра и кладёт их в Assets/Art/Heroine/Jump.
 
-Почему не полный Concepts/walk/slice_walk.py: тот рассчитан ровно на три
-фигуры в ряд, а модель на листе прыжка даёт три — из них средняя оказалась
-обычным шагом, а не фазой прыжка. Поэтому здесь та же логика (альфа снимается
-заливкой от границы по цвету фона, каждая фигура приводится к общей высоте,
-головы ставятся на одну точку), но берутся фигуры 1 и 3.
+Почему не полный Concepts/walk/slice_walk.py: тот режет лист на три кадра,
+а прыжку нужно два. Логика та же (альфа снимается заливкой от границы по
+цвету фона, каждая фигура приводится к общей высоте, головы ставятся на
+одну точку).
 
 Почему не поза с подтянутыми коленями (Concepts/jump/jump_sheet_v1b.png):
 там фигуры 482 и 619 px, разница 28%. Прыжок в платформере обязан держать
 рост: при выравнивании по общей высоте сжатая поза растянулась бы вдвое, а
 без выравнивания прыжок выглядел бы как уменьшение героини. Поэтому взяты
-позы в полный рост (649 и 674 px, разброс 4%) — разлетающиеся руки и коса
+позы в полный рост (887 и 858 px, разброс 3.3%) — разлетающиеся руки и коса
 считываются как «в воздухе», а размер остаётся прежним.
+
+Рукава в исходном стиле длинные — до запястья, со сборкой в кружевную
+манжету. Листы v1a/v2a без длинных рукавов брать нельзя.
 
 Рамка, высота, точка под ступнями и пивот — ровно как у кадров ходьбы, чтобы
 переход ходьба -> прыжок -> ходьба не дёргался.
@@ -22,14 +24,14 @@ import re
 import subprocess
 from collections import deque
 
-SHEET = 'Concepts/jump/jump_sheet_v1a.png'
+SHEET = 'Concepts/jump/jump_sheet_v2a.png'
 OUT_DIR = 'Assets/Art/Heroine/Jump'
 META_TPL = 'Assets/Art/Heroine/Walk/walk_1.png.meta'
 CANVAS_W, CANVAS_H = 330, 512
 TARGET_H = 479           # общая высота фигуры, как у кадров ходьбы
 FEET_Y = 504             # на какой высоте стоят ступни
 HEAD_FRACTION = 0.30
-PICK = (0, 2)           # фигуры 1 и 3, средняя (шаг) пропускается
+PICK = (0, 1)           # на этом листе ровно две фигуры: взлёт и падение
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -181,8 +183,8 @@ print(f'дыр вычищено: {holes}')
 
 boxes = components(mask, W, H, 2000)
 print('фигур найдено:', len(boxes), '-> берём', [i + 1 for i in PICK])
-if len(boxes) < 3:
-    raise SystemExit('ожидалось 3 фигуры на листе, чтобы пропустить среднюю')
+if len(boxes) != 2:
+    raise SystemExit('ожидалось ровно 2 фигуры на листе прыжка')
 
 picked = [boxes[i] for i in PICK]
 heights = [b[3] - b[1] for b in picked]
@@ -222,8 +224,8 @@ for n, (x0, y0, x1, y1) in enumerate(picked, 1):
     os.remove(scaled)
     print(f'кадр {n}: {fw}x{fh} -> {sw}x{sh}, сдвиг {dx:+d}/{dy:+d}, {out}')
 
-    guid = hashlib.md5(('jump-v1-' + str(n)).encode()).hexdigest()
-    sid = hashlib.md5(('jump-v1-sprite-' + str(n)).encode()).hexdigest()
+    guid = hashlib.md5(('jump-v2-' + str(n)).encode()).hexdigest()
+    sid = hashlib.md5(('jump-v2-sprite-' + str(n)).encode()).hexdigest()
     meta = open(META_TPL, encoding='utf-8').read()
     meta = (meta.replace(re.search(r'guid: ([0-9a-f]{32})', meta).group(1), guid)
                 .replace(re.search(r'spriteID: ([0-9a-f]{32})', meta).group(1), sid))
