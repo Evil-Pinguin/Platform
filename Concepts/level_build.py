@@ -267,7 +267,7 @@ def dummy(gid, name, x, top, health, order):
     """Резной столб-мишень: спрайт сергэ, сплошной коллайдер, Damageable."""
     guid, pw, ph, ppu = DECOR['serge_pole']
     w, h = round(pw / ppu, 4), round(ph / ppu, 4)
-    out = [gameobject(gid, name, [gid+1, gid+2, gid+3], order)]
+    out = [gameobject(gid, name, [gid+1, gid+2, gid+3, gid+4], order)]
     out.append(transform(gid+1, gid, (x, top, -0.4), order))
     out.append(sprite(gid+2, gid, guid, 1, (w, h), 0))
     out.append(box(gid+3, gid, (0, h/2), (0.5, h)))

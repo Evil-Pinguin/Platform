@@ -6908,6 +6908,7 @@ GameObject:
   - component: {fileID: 250000001}
   - component: {fileID: 250000002}
   - component: {fileID: 250000003}
+  - component: {fileID: 250000004}
   m_Layer: 0
   m_Name: Dummy_1
   m_TagString: Untagged
@@ -7028,6 +7029,7 @@ GameObject:
   - component: {fileID: 250000011}
   - component: {fileID: 250000012}
   - component: {fileID: 250000013}
+  - component: {fileID: 250000014}
   m_Layer: 0
   m_Name: Dummy_2
   m_TagString: Untagged
@@ -7148,6 +7150,7 @@ GameObject:
   - component: {fileID: 250000021}
   - component: {fileID: 250000022}
   - component: {fileID: 250000023}
+  - component: {fileID: 250000024}
   m_Layer: 0
   m_Name: Dummy_3
   m_TagString: Untagged

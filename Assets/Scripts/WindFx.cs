@@ -6,6 +6,11 @@ using UnityEngine;
 //
 // Что выдаёт: порыв на рывке, след за лентой, взмах у ножа, пыль под
 // ногами при приземлении, облачко на прыжке и всплеск в точке попадания.
+//
+// Модули частиц (main, emission, shape, ...) — структуры, которые Unity
+// отдаёт ПО КОПИИ. Если взять `var m = ps.main` и написать `m.loop = true`,
+// правка пропадёт: её надо записать обратно `ps.main = m`. Все настройки
+// ниже поэтому собираются в локальную переменную и кладутся обратно.
 public class WindFx : MonoBehaviour
 {
     [Tooltip("Пыль под ногами при приземлении, частиц")]
@@ -36,18 +41,19 @@ public class WindFx : MonoBehaviour
 
     void Awake()
     {
-        pc = GetComponentInParent<PlayerController>();
+        if (pc == null) pc = GetComponentInParent<PlayerController>();
         mat = SharedMaterial();
 
-        gust = Build("Gust", windColor, 0.22f, 0.22f, 3f);
-        trail = Build("Trail", windColor, 0.15f, 0.45f, 2f);
-        burst = Build("Burst", dustColor, 0.28f, 0.28f, 2f);
-        hit = Build("Hit", windColor, 0.18f, 0.4f, 4f);
+        gust  = Build("Gust",  windColor, 0.22f, 0.22f, 3);
+        trail = Build("Trail", windColor, 0.15f, 0.45f, 2);
+        burst = Build("Burst", dustColor, 0.28f, 0.28f, 2);
+        hit   = Build("Hit",   windColor, 0.18f, 0.4f,  4);
 
-        var shape = hit.shape;                 // попадания расходятся сферой
+        // попадания расходятся сферой
+        var shape = hit.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
         shape.radius = 0.1f;
-        hit.GetComponent<ParticleSystemRenderer>().sortingOrder = 4f;
+        hit.shape = shape;
     }
 
     void Update()
@@ -55,8 +61,13 @@ public class WindFx : MonoBehaviour
         // След подмешивается к рывку: летит — сыпет, стоит — молчит.
         // Время шкалы подкручиваем назад, иначе после остановки сыплется
         // ещё целую секунду.
+        if (trail == null) return;
+
         float rate = pc != null && pc.DashActive ? 60f : 0f;
-        trail.emission.rateOverTime = rate;
+        var em = trail.emission;
+        em.rateOverTime = rate;
+        trail.emission = em;
+
         if (rate > 0f && trail.time > 0.05f)
             trail.time = 0f;
     }
@@ -91,13 +102,17 @@ public class WindFx : MonoBehaviour
 
     public void Hit(Vector2 point, float dir = 1f)
     {
+        if (hit == null) return;
         hit.transform.position = point;
+
+        // Летят по дуге наружу от точки удара
         var vel = hit.velocityOverLifetime;
         vel.enabled = true;
-        vel.x = new ParticleSystem.MinMaxCurve(
-            AnimationCurve.EaseInOut(0f, dir * 2.5f, 1f, dir * 5.5f));
-        vel.y = new ParticleSystem.MinMaxCurve(
-            AnimationCurve.EaseInOut(0f, 1.2f, 1f, 3.2f));
+        vel.space = ParticleSystemSimulationSpace.World;
+        vel.x = new ParticleSystem.MinMaxCurve(dir * 2.5f, dir * 5.5f);
+        vel.y = new ParticleSystem.MinMaxCurve(1.2f, 3.2f);
+        hit.velocityOverLifetime = vel;
+
         Emit(hit, hitBurst);
     }
 
@@ -110,11 +125,12 @@ public class WindFx : MonoBehaviour
 
     // --- сборка частиц ---------------------------------------------------------
 
-    ParticleSystem Build(string name, Color colour, float size, float lifetime, float order)
+    ParticleSystem Build(string name, Color colour, float size, float lifetime, int order)
     {
         var go = new GameObject("Fx_" + name);
         go.transform.SetParent(transform, false);
         go.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+
         var ps = go.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
@@ -130,27 +146,33 @@ public class WindFx : MonoBehaviour
         main.maxParticles = 220;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        ps.main = main;
 
-        var emission = ps.emission;
-        emission.enabled = true;
-        emission.rateOverTime = 0f;
+        var em = ps.emission;
+        em.enabled = true;
+        em.rateOverTime = 0f;
+        ps.emission = em;
 
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 30f;
         shape.radius = 0.12f;
+        ps.shape = shape;
 
         // Прозракают по дуге: вспыхивают и тают
         var col = ps.colorOverLifetime;
         col.enabled = true;
         col.color = new ParticleSystem.MinMaxGradient(Fade(colour));
+        ps.colorOverLifetime = col;
 
-        // Растут по ходу жизни — порыв раздувается наружу
+        // Растут по ходу жизни — порыв раздувается наружу.
+        // Кривую задаём двумя числами, а не AnimationCurve: такой вызов
+        // MinMaxCurve есть во всех версиях Unity.
         var grow = ps.sizeOverLifetime;
         grow.enabled = true;
-        grow.size = new ParticleSystem.MinMaxCurve(1f,
-            AnimationCurve.EaseInOut(0f, 0.35f, 1f, 1.3f));
+        grow.size = new ParticleSystem.MinMaxCurve(0.35f, 1.3f);
+        ps.sizeOverLifetime = grow;
 
         var r = ps.GetComponent<ParticleSystemRenderer>();
         if (mat != null) r.material = mat;

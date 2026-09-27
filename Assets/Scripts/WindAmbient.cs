@@ -3,6 +3,9 @@ using UnityEngine;
 // Мелкая взвесь по всему уровню: пыль, пёрышки, снежная крупа. Медленно
 // плывёт вправо и чуть проседает, поэтому воздух перестаёт быть пустым.
 // Тоже целиком из кода: тот же материал и та же нарисованная текстура.
+//
+// Как и в WindFx, модули частиц отдаются по копии — все настройки
+// кладутся обратно присваиванием вида ps.main = main.
 public class WindAmbient : MonoBehaviour
 {
     [Tooltip("Насколько широко насыпать, юниты")]
@@ -29,25 +32,32 @@ public class WindAmbient : MonoBehaviour
         go.transform.localPosition = new Vector3(centre.x, centre.y, 0f);
 
         var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
         var main = ps.main;
+        main.duration = 20f;
         main.loop = true;
-        main.playOnAwake = true;
+        main.playOnAwake = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(14f, 22f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(drift * 0.5f, drift * 1.4f);
         main.startSize = new ParticleSystem.MinMaxCurve(size.x, size.y);
         main.startColor = new ParticleSystem.MinMaxGradient(tint);
         main.gravityModifier = 0.06f;   // медленно оседает
-        main.maxParticles = count + 40;
+        main.maxParticles = Mathf.Max(1, count + 40);
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        ps.main = main;
 
-        var emission = ps.emission;
-        emission.rateOverTime = count / 18f;   // держим ровно count штук в воздухе
+        var em = ps.emission;
+        em.enabled = true;
+        em.rateOverTime = count / 18f;   // держим ровно count штук в воздухе
+        ps.emission = em;
 
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale = new Vector3(area.x, area.y, 1f);
+        ps.shape = shape;
 
         // Медленно полошит по кругу, чтобы не летело строем
         var noise = ps.noise;
@@ -55,6 +65,7 @@ public class WindAmbient : MonoBehaviour
         noise.strength = new ParticleSystem.MinMaxCurve(0.12f, 0.3f);
         noise.frequency = 0.25f;
         noise.scrollSpeed = 0.2f;
+        ps.noise = noise;
 
         var col = ps.colorOverLifetime;
         col.enabled = true;
@@ -66,11 +77,13 @@ public class WindAmbient : MonoBehaviour
                     new GradientAlphaKey(tint.a, 0.75f),
                     new GradientAlphaKey(0f, 1f) });
         col.color = new ParticleSystem.MinMaxGradient(g);
+        ps.colorOverLifetime = col;
 
         var r = ps.GetComponent<ParticleSystemRenderer>();
         r.material = WindFx.SharedMaterial();
-        r.sortingOrder = -9f;    // позади всего, кроме фона
+        r.sortingOrder = -9;      // позади всего, кроме фона
         r.renderMode = ParticleSystemRenderMode.Billboard;
-    }
 
+        ps.Play();
+    }
 }
