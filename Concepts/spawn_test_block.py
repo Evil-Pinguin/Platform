@@ -15,6 +15,7 @@
 старые объекты вырезаются.
 """
 import re
+import sys
 
 SCENE = 'Assets/Scenes/TestLevel.unity'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
@@ -112,6 +113,12 @@ s = open(SCENE, encoding='utf-8').read()
 # выкидываем прежние тестовые объекты
 for pref in ('90', '91'):
     s, n = re.subn(r'--- !u!\d+ &' + pref + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
+
+if len(sys.argv) > 1 and sys.argv[1] == 'remove':
+    s = re.sub(r'  - \{fileID: (?:900000001|910000001)\}\n', '', s)
+    open(SCENE, 'w', encoding='utf-8').write(s)
+    print('тестовые объекты удалены')
+    raise SystemExit
 
 blocks = [
     go(900000001, 'TEST_Block', [900000002, 900000003, 900000004, 900000006]),

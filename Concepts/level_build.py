@@ -289,12 +289,16 @@ s, n = re.subn(r'(--- !u!114 &100000005\nMonoBehaviour:.*?  followY: )[01]',
 assert n == 1, f'followY: {n}'
 
 # --- конфигурация PlayerController
+# Цикл ходьбы — 4 кадра из восьми (каждый второй). Восемь кадров на
+# 12 fps давали цикл 0.67 с, то есть 1.78 роста пути за цикл: ноги
+# переступали вдвое реже, чем шёл корпус, и это читалось как скольжение.
+# Четыре кадра на тех же 12 fps дают 0.33 с ~= 0.9 роста — почти натура.
 frames = '\n'.join(
     f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in
-    ['7a2d62ffd4fe461990b64ffe293dc930', '334e38dba303439bbcb282a1a842582c',
-     '164fb7696ad34f3a9910630351b6bf06', '22d6721341cd46f18ec3bab4728fb4d9',
-     '90b168f17df94355a5c63298da7e1f43', '0b1dc8ab10cd479e874689e3d94276ee',
-     '1ae4d6901c194c62a2e0e62b49e6a309', '97fcaa228c8648e0a1b563d43e3bcd7f'])
+    ['7a2d62ffd4fe461990b64ffe293dc930',   # walk_1 — контакт
+     '164fb7696ad34f3a9910630351b6bf06',   # walk_3
+     '90b168f17df94355a5c63298da7e1f43',   # walk_5
+     '1ae4d6901c194c62a2e0e62b49e6a309'])  # walk_7
 s, n = re.subn(
     r'(--- !u!114 &400000006\nMonoBehaviour:.*?  m_EditorClassIdentifier: \n)'
     r'(?:(?!--- !u!).)*',
