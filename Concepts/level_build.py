@@ -50,6 +50,12 @@ DECOR_TREE = {
 
 GROUND_H = 2.933594      # спрайт земли при PPU 256
 GROUND_COLL = 2.5        # толщина коллайдера земли
+# У спрайта земли 58 прозрачных строк сверху (PPU 256 => 0.2266 юнита), а пивот
+# стоит по верхнему краю холста. Из-за этого видимая трава оказывалась НИЖЕ
+# поверхности, на которой стоит героиня, и между её ступнями и землёй зиял
+# просвет. Поэтому GameObject поднимаем на GROUND_LIFT, а коллайдер опускаем на
+# столько же: верх поверхности остаётся ровно на GROUND[y][3].
+GROUND_LIFT = 0.2266
 CHASM_DEPTH = 6.0
 START_X = -30.0           # где встаёт героиня
 HERO_Y = 0.031           # её ступни в локальных координатах
@@ -337,9 +343,10 @@ for i, (name, x0, x1, top) in enumerate(GROUND):
     gid = 210000000 + i * 10
     w, cx = round(x1 - x0, 4), round((x0 + x1) / 2, 4)
     blocks.append(gameobject(gid, name, [gid + 1, gid + 2, gid + 3], order))
-    blocks.append(transform(gid + 1, gid, (cx, top, 0), order))
+    blocks.append(transform(gid + 1, gid, (cx, round(top + GROUND_LIFT, 4), 0), order))
     blocks.append(sprite(gid + 2, gid, GROUND_GUID, ORDER_GROUND, (w, GROUND_H), 2))
-    blocks.append(box(gid + 3, gid, (0, -GROUND_COLL / 2), (w, GROUND_COLL)))
+    blocks.append(box(gid + 3, gid, (0, round(-GROUND_LIFT - GROUND_COLL / 2, 4)),
+                      (w, GROUND_COLL)))
     order += 1
 
 # --- платформы: спрайт по центру => transform y = низ + 0.5
