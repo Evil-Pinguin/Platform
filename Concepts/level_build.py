@@ -301,6 +301,34 @@ s, n = re.subn(
     s, flags=re.S)
 assert n == 1, f'PlayerController: {n}'
 
+
+# --- корень сцены ----------------------------------------------------
+# С 2020.1 Unity держит список корневых объектов отдельным блоком
+# SceneRoots. Без него сцена, написанная руками, не открывается:
+# редактор показывает пустоту. Эта ошибка стоила пустого экрана.
+def scene_roots(text):
+    text = re.sub(r'--- !u!1660057539 &\d+\nSceneRoots:\n(?:(?!--- !u!).)*',
+                  '', text, flags=re.S)
+    roots = []
+    for b in re.split(r'^--- ', text, flags=re.M):
+        if not b.startswith('!u!4 &'):
+            continue
+        if re.search(r'm_Father: \{fileID: 0\}', b) is None:
+            continue
+        roots.append((int(re.search(r'm_RootOrder: (\d+)', b).group(1)),
+                      re.search(r'm_GameObject: \{fileID: (\d+)\}', b).group(1)))
+    roots.sort()
+    globals()['roots_built'] = len(roots)
+    listed = '\n'.join(f'  - {{fileID: {g}}}' for _, g in roots)
+    return text.rstrip('\n') + (
+        '\n\n--- !u!1660057539 &9223372036854775807\nSceneRoots:\n'
+        '  m_ObjectHideFlags: 0\n  m_Roots:\n' + listed + '\n')
+
+
+roots_built = 0
+s = scene_roots(s)
+
 open(SCENE, 'w', encoding='utf-8').write(s)
 print(f'уровень собран: земля {len(GROUND)} | платформы {len(PLATFORMS)} | '
-      f'провалы {len(gaps)} | декор {placed} | вырезано блоков {stripped}')
+      f'провалы {len(gaps)} | декор {placed} | вырезано блоков {stripped} | '
+      f'корневых объектов {roots_built}')
