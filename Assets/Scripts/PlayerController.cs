@@ -78,6 +78,10 @@ public class PlayerController : MonoBehaviour
     public float walkFps = 12f;
     [Tooltip("Спрайт, когда героиня стоит на месте")]
     public Sprite idleSprite;
+    [Tooltip("Кадры прыжка по порядку: взлёт, падение (нарисованы лицом вправо)")]
+    public Sprite[] jumpFrames;
+    [Tooltip("С какой вертикальной скорости показывается падающий кадр, юниты/с")]
+    public float jumpFallSpeed = 0.1f;
 
     [Header("Если упала с края")]
     [Tooltip("Ниже этой высоты героиня возвращается в точку старта")]
@@ -419,6 +423,21 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        // В воздухе — кадры прыжка: взлёт, пока ещё летит вверх, и падение,
+        // как только начала опускаться. Кадры взяты в полный рост, поэтому
+        // переход ходьба -> прыжок не меняет размер фигуры.
+        if (!grounded && jumpFrames != null && jumpFrames.Length > 0)
+        {
+            int frame = body.velocity.y > jumpFallSpeed ? 0 : jumpFrames.Length - 1;
+            if (frame != shownFrame)
+            {
+                shownFrame = frame;
+                spriteRenderer.sprite = jumpFrames[frame];
+            }
+            spriteRenderer.flipX = face < 0f;
+            return;
+        }
+
         // Шагаем, только если реально идём по земле
         bool walking = grounded
                     && Mathf.Abs(move) > 0.01f
@@ -439,7 +458,7 @@ public class PlayerController : MonoBehaviour
         {
             animTimer = 0f;
             shownFrame = -1;
-            // В воздухе держим последний кадр, на земле — позу покоя
+            // Стоим на месте — поза покоя
             if (grounded && idleSprite != null)
                 spriteRenderer.sprite = idleSprite;
         }

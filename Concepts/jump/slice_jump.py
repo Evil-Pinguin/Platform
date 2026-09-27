@@ -1,47 +1,45 @@
-"""Режет лист походки на кадры и кладёт их в Assets/Art/Heroine/Walk.
+"""Режет лист прыжка на 2 кадра и кладёт их в Assets/Art/Heroine/Jump.
 
-Тот же приём, что в Concepts/attack/slice_attack.py: альфа снимается
-заливкой от границы по цвету фона, дыры внутри фигуры вычищаются,
-каждая фигура приводится к общей высоте (иначе в игре пульсирует
-рост), и головы всех кадров ставятся на одну и ту же точку — чтобы
-корпус не ездил влево-вправо и чтобы переход с ходьбы на удар не
-дёргался.
+Почему не полный Concepts/walk/slice_walk.py: тот рассчитан ровно на три
+фигуры в ряд, а модель на листе прыжка даёт три — из них средняя оказалась
+обычным шагом, а не фазой прыжка. Поэтому здесь та же логика (альфа снимается
+заливкой от границы по цвету фона, каждая фигура приводится к общей высоте,
+головы ставятся на одну точку), но берутся фигуры 1 и 3.
 
-Отличия от резальщика атаки:
-  * холст 330 px, а не 560: ходьбе широкий холст не нужен;
-  * пивот остаётся ровно посередине (165 px), как у прежних кадров,
-    поэтому кадры атаки продолжают попадать в ту же точку;
-  * кадров три, а не четыре. Модель надёжно рисует три фигуры в ряд;
-    четыре она уводит в сетку 2x2 и теряет различие поз. Три кадра при
-    9 fps дают те же 0.33 с на цикл, что и четыре при 12.
+Почему не поза с подтянутыми коленями (Concepts/jump/jump_sheet_v1b.png):
+там фигуры 482 и 619 px, разница 28%. Прыжок в платформере обязан держать
+рост: при выравнивании по общей высоте сжатая поза растянулась бы вдвое, а
+без выравнивания прыжок выглядел бы как уменьшение героини. Поэтому взяты
+позы в полный рост (649 и 674 px, разброс 4%) — разлетающиеся руки и коса
+считываются как «в воздухе», а размер остаётся прежним.
+
+Рамка, высота, точка под ступнями и пивот — ровно как у кадров ходьбы, чтобы
+переход ходьба -> прыжок -> ходьба не дёргался.
 """
+import hashlib
 import os
 import re
 import subprocess
-import hashlib
 from collections import deque
 
-SHEET = 'Concepts/walk/walk_sheet_v9a.png'
-OUT_DIR = 'Assets/Art/Heroine/Walk'
+SHEET = 'Concepts/jump/jump_sheet_v1a.png'
+OUT_DIR = 'Assets/Art/Heroine/Jump'
+META_TPL = 'Assets/Art/Heroine/Walk/walk_1.png.meta'
 CANVAS_W, CANVAS_H = 330, 512
-WALK_PIVOT_PX = 165      # пивот прежних кадров: ровно середина холста
-TARGET_H = 479           # общая высота фигуры в пикселях
+TARGET_H = 479           # общая высота фигуры, как у кадров ходьбы
 FEET_Y = 504             # на какой высоте стоят ступни
 HEAD_FRACTION = 0.30
+PICK = (0, 2)           # фигуры 1 и 3, средняя (шаг) пропускается
 
 os.makedirs(OUT_DIR, exist_ok=True)
+
+BG = None
 
 
 def im_size(img):
     a, b = subprocess.run(['identify', '-format', '%w %h', img],
                           capture_output=True, text=True).stdout.split()
     return int(a), int(b)
-
-
-# Фон берём с угла листа, а не задаём порогами: на этом листе он не
-# белый, а кремовый (245, 240, 216), и проверка «все каналы > 236»
-# его не узнавала — весь лист считался одной фигурой.
-BG = None
 
 
 def is_bg(px, i):
@@ -80,8 +78,7 @@ def flood_mask(px, w, h):
 
 
 def clear_enclosed(rgba, mask, w, h):
-    """Вычищает белые дыры, оказавшиеся внутри фигуры (между рукавом и
-    туловищем, между косой и платьем)."""
+    """Вычищает дыры фона, оказавшиеся внутри фигуры."""
     seen = bytearray(w * h)
     q = deque()
     for x in range(w):
@@ -141,8 +138,6 @@ def components(mask, w, h, min_area):
 
 
 def head_centre(mask, w, h, box):
-    """Середина головы по верхним HEAD_FRACTION высоте фигуры: не зависит
-    от позы рук и ног, в отличие от середины всей рамки."""
     x0, y0, x1, y1 = box
     cut = y0 + max(1, int((y1 - y0) * HEAD_FRACTION))
     cols = [x for x in range(x0, x1)
@@ -157,17 +152,18 @@ def alpha_mask(path):
     return px, w, h
 
 
-# --- опорная точка: где голова на НЫНЕШНИХ кадрах ходьбы. Считаем до
-# перезаписи файлов, иначе опорой станет сам себя.
+# --- опорная точка берётся с УЖЕ готовых кадров ходьбы, чтобы в прыжке
+#     корпус не уезжал вбок. Только walk_1..3: walk_4..8 — легаси от
+#     прежнего четырёхкадрового цикла и в среднем сбивали бы точку.
 walk_centres = []
-for i in range(1, 5):
+for i in (1, 2, 3):
     px, w, h = alpha_mask(f'Assets/Art/Heroine/Walk/walk_{i}.png')
     m = bytearray(255 if a > 40 else 0 for a in px[3::4])
     boxes = components(m, w, h, 2000)
     if boxes:
         walk_centres.append(head_centre(m, w, h, max(boxes, key=lambda b: b[1] - b[0])))
 TARGET_HEAD_X = sum(walk_centres) / len(walk_centres)
-print(f'корпус на прежних кадрах ходьбы: {TARGET_HEAD_X:.1f}px '
+print(f'корпус на кадрах ходьбы: {TARGET_HEAD_X:.1f}px '
       f'(разброс {max(walk_centres) - min(walk_centres):.1f}px)')
 
 W, H = im_size(SHEET)
@@ -181,40 +177,41 @@ painted = bytearray(src)
 for i in range(W * H):
     painted[i * 4 + 3] = mask[i]
 fixed, holes = clear_enclosed(bytes(painted), mask, W, H)
-print(f'белых дыр вычищено: {holes}')
+print(f'дыр вычищено: {holes}')
 
 boxes = components(mask, W, H, 2000)
-print('фигур найдено:', len(boxes))
-if len(boxes) != 3:
-    raise SystemExit('ожидалось ровно 3 фигуры')
+print('фигур найдено:', len(boxes), '-> берём', [i + 1 for i in PICK])
+if len(boxes) < 3:
+    raise SystemExit('ожидалось 3 фигуры на листе, чтобы пропустить среднюю')
 
-heights = [b[3] - b[1] for b in boxes]
+picked = [boxes[i] for i in PICK]
+heights = [b[3] - b[1] for b in picked]
 print('высоты в листе:', heights,
       f'разброс {100 * (max(heights) - min(heights)) / min(heights):.1f}%')
+if (max(heights) - min(heights)) / min(heights) > 0.08:
+    raise SystemExit('разброс высот больше 8%: прыжок не должен менять рост')
 scales = [TARGET_H / h for h in heights]
 
-for idx, (x0, y0, x1, y1) in enumerate(boxes, 1):
+for n, (x0, y0, x1, y1) in enumerate(picked, 1):
     fw, fh = x1 - x0, y1 - y0
     crop = bytearray()
     for y in range(y0, y1):
         crop += fixed[(y * W + x0) * 4:(y * W + x1) * 4]
-    tmp = f'/tmp/wk_{idx}.rgba'
+    tmp = f'/tmp/jp_{n}.rgba'
     with open(tmp, 'wb') as f:
         f.write(bytes(crop))
-    scaled = f'/tmp/wk_{idx}_s.png'
-    scale = scales[idx - 1]
+    scaled = f'/tmp/jp_{n}_s.png'
+    scale = scales[n - 1]
     subprocess.run(['convert', '-size', f'{fw}x{fh}', '-depth', '8', f'rgba:{tmp}',
                     '-filter', 'Lanczos', '-resize',
                     f'{int(fw*scale)}x{int(fh*scale)}', scaled], check=True)
     sw, sh = im_size(scaled)
 
-    # после масштабирования ступни должны встать на FEET_Y
     dy = FEET_Y - sh
-    # голова после масштабирования — на ту же опорную точку
     hx = (head_centre(mask, W, H, (x0, y0, x1, y1)) - x0) * scale
     dx = round(TARGET_HEAD_X - hx)
 
-    out = f'{OUT_DIR}/walk_{idx}.png'
+    out = f'{OUT_DIR}/jump_{n}.png'
     left = min(0, dx)
     width = max(CANVAS_W, dx + sw) - left
     subprocess.run(['convert', '-size', f'{width}x{CANVAS_H}', 'xc:none', scaled,
@@ -223,20 +220,31 @@ for idx, (x0, y0, x1, y1) in enumerate(boxes, 1):
                    check=True)
     os.remove(tmp)
     os.remove(scaled)
-    print(f'кадр {idx}: {fw}x{fh} -> {sw}x{sh}, сдвиг {dx:+d}/{dy:+d}, {out}')
+    print(f'кадр {n}: {fw}x{fh} -> {sw}x{sh}, сдвиг {dx:+d}/{dy:+d}, {out}')
 
-    guid = hashlib.md5(('walk-v8-' + str(idx)).encode()).hexdigest()
-    sid = hashlib.md5(('walk-v8-sprite-' + str(idx)).encode()).hexdigest()
-    meta = open('Assets/Art/Heroine/Walk/walk_1.png.meta', encoding='utf-8').read()
+    guid = hashlib.md5(('jump-v1-' + str(n)).encode()).hexdigest()
+    sid = hashlib.md5(('jump-v1-sprite-' + str(n)).encode()).hexdigest()
+    meta = open(META_TPL, encoding='utf-8').read()
     meta = (meta.replace(re.search(r'guid: ([0-9a-f]{32})', meta).group(1), guid)
-                .replace(re.search(r'spriteID: ([0-9a-f]{32})', meta).group(1), sid)
-                .replace('  alignment: 1\n  spritePivot: {x: 0.2946, y: 0.0488}',
-                         '  alignment: 7\n  spritePivot: {x: 0.5, y: 0}'))
-    assert 'alignment: 7' in meta, meta[:200]
-    open(f'{OUT_DIR}/walk_{idx}.png.meta', 'w', encoding='utf-8').write(meta)
+                .replace(re.search(r'spriteID: ([0-9a-f]{32})', meta).group(1), sid))
+    assert 'alignment: 7' in meta and 'spritePivot: {x: 0.5, y: 0}' in meta, meta[:300]
+    open(f'{OUT_DIR}/jump_{n}.png.meta', 'w', encoding='utf-8').write(meta)
+    print(f'  guid {guid}')
 
-subprocess.run(['convert'] + [f'{OUT_DIR}/walk_{i}.png' for i in range(1, 4)]
+# мета папки
+folder = hashlib.md5(b'heroine-jump-folder').hexdigest()
+open(f'{OUT_DIR}.meta', 'w', encoding='utf-8').write(
+    'fileFormatVersion: 2\n'
+    f'guid: {folder}\n'
+    'folderAsset: yes\n'
+    'DefaultImporter:\n'
+    '  externalObjects: {}\n'
+    '  userData: \n'
+    '  assetBundleName: \n'
+    '  assetBundleVariant: \n')
+
+subprocess.run(['convert'] + [f'{OUT_DIR}/jump_{i}.png' for i in (1, 2)]
                + ['+append', '-background', '#2b2f3a', '-bordercolor', '#2b2f3a',
-                  '-border', '6', '/tmp/walk_preview.png'], check=True)
-print('превью: /tmp/walk_preview.png')
-print(f'пивот кадров: 0.5000 ({WALK_PIVOT_PX}px на холсте {CANVAS_W})')
+                  '-border', '6', '/tmp/jump_preview.png'], check=True)
+print('превью: /tmp/jump_preview.png')
+print('пивот кадров: 0.5000 (165px на холсте 330)')

@@ -393,6 +393,10 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 30d934941ae7437c05aed5354e92af3f, type: 3}
   walkFps: 9
   idleSprite: {fileID: 21300000, guid: c46dd459691fd1dd598775d241a19a84, type: 3}
+  jumpFrames:
+  - {fileID: 21300000, guid: 6daf268587750afe7fbb340b4fe37705, type: 3}
+  - {fileID: 21300000, guid: 336c0b56e3212ee017ac0d1395292e71, type: 3}
+  jumpFallSpeed: 0.1
   attackFrames:
   - {fileID: 21300000, guid: dc1783b3a5c9607e12c781b8f88ebef7, type: 3}
   - {fileID: 21300000, guid: e58d2f83e7543184b89c6ebf520dc6f6, type: 3}
