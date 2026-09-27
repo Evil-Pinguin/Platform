@@ -16,6 +16,8 @@ public class PlayerController : MonoBehaviour
     public float walkFps = 12f;
     [Tooltip("Спрайт, когда героиня стоит на месте")]
     public Sprite idleSprite;
+    [Tooltip("Спрайт, когда героиня стоит и смотрит прямо в камеру. Если пусто — берётся idleSprite")]
+    public Sprite idleFrontSprite;
 
     [Header("Если упала с края")]
     [Tooltip("Ниже этой высоты героиня возвращается в точку старта")]
@@ -26,6 +28,9 @@ public class PlayerController : MonoBehaviour
     float moveInput;
     float animTimer;
     Vector2 startPosition;
+
+    // Спрайт для позы покоя: сперва пробуем фронтальный (смотрит в камеру).
+    Sprite RestSprite => idleFrontSprite != null ? idleFrontSprite : idleSprite;
 
     void Awake()
     {
@@ -56,8 +61,15 @@ public class PlayerController : MonoBehaviour
         else
         {
             animTimer = 0f;
-            if (idleSprite != null)
-                spriteRenderer.sprite = idleSprite;
+
+            // Стоит — разворачиваемся лицом к камере (фронтальный спрайт не отражаем).
+            Sprite rest = RestSprite;
+            if (rest != null)
+            {
+                spriteRenderer.sprite = rest;
+                if (idleFrontSprite != null)
+                    spriteRenderer.flipX = false;
+            }
         }
 
         if (body.position.y < respawnBelowY)
