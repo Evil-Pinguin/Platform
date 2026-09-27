@@ -403,6 +403,15 @@ MonoBehaviour:
   - {fileID: 21300000, guid: dc1783b3a5c9607e12c781b8f88ebef7, type: 3}
   - {fileID: 21300000, guid: e58d2f83e7543184b89c6ebf520dc6f6, type: 3}
   - {fileID: 21300000, guid: be4bc24d2bc77d76f96772ae3e2efa11, type: 3}
+  fallAttackFrames:
+  - {fileID: 21300000, guid: 3b4cf09e9f0204a0697c8009f9a9f630, type: 3}
+  - {fileID: 21300000, guid: 997a6cc6a5ae2a1a65632ef80f4f9c77, type: 3}
+  fallAttackDuration: 0.34
+  fallAttackDamage: 2
+  fallHitboxCenterX: 0.5
+  fallHitboxCenterY: 0.35
+  fallHitboxSize: {x: 1.1, y: 1.6}
+  fallHitWindow: {x: 0.25, y: 0.8}
   attackDuration: 0.32
   attackCooldown: 0.1
   attackMoveScale: 0.35

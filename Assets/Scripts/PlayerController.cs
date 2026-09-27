@@ -42,6 +42,22 @@ public class PlayerController : MonoBehaviour
     [Tooltip("С какой доли удара и до какой хитбокс живой, 0…1")]
     public Vector2 hitWindow = new Vector2(0.3f, 0.7f);
 
+    [Header("Удар при падении")]
+    [Tooltip("Кадры удара в падении: замах в воздухе, удар ножом вниз")]
+    public Sprite[] fallAttackFrames;
+    [Tooltip("Сколько длится удар при падении, секунды")]
+    public float fallAttackDuration = 0.34f;
+    [Tooltip("Урон удара при падении. Обычный удар бьёт слабее")]
+    public int fallAttackDamage = 2;
+    [Tooltip("Центр хитбокса удара при падении по горизонтали, юниты")]
+    public float fallHitboxCenterX = 0.5f;
+    [Tooltip("Центр хитбокса удара при падении по вертикали, юниты")]
+    public float fallHitboxCenterY = 0.35f;
+    [Tooltip("Размер хитбокса удара при падении, юниты")]
+    public Vector2 fallHitboxSize = new Vector2(1.1f, 1.6f);
+    [Tooltip("Окно удара при падении, с какой доли и до какой, 0…1")]
+    public Vector2 fallHitWindow = new Vector2(0.25f, 0.8f);
+
     [Header("Способности")]
     [Tooltip("Какая способность выбрана сейчас: 0 рывок, 1 вихрь, 2 волна, 3 рывок с ударом, 4 двойной прыжок")]
     public int selectedAbility = 0;
@@ -114,6 +130,7 @@ public class PlayerController : MonoBehaviour
     float jumpStartedAt = -99f;
     float attackStartedAt = -99f;
     bool attacking;
+    bool fallingStrike;      // текущий удар — в падении, ножом вниз
     readonly System.Collections.Generic.HashSet<Damageable> hitThisSwing =
         new System.Collections.Generic.HashSet<Damageable>();
     readonly System.Collections.Generic.HashSet<Damageable> hitThisDash =
@@ -258,9 +275,11 @@ public class PlayerController : MonoBehaviour
     {
         if (attacking)
         {
-            if (Time.time - attackStartedAt >= attackDuration + attackCooldown)
+            float dur = fallingStrike ? fallAttackDuration : attackDuration;
+            if (Time.time - attackStartedAt >= dur + attackCooldown)
             {
                 attacking = false;
+                fallingStrike = false;
                 animTimer = 0f;
                 shownFrame = -1;
             }
@@ -275,6 +294,14 @@ public class PlayerController : MonoBehaviour
                     || Input.GetKeyDown(KeyCode.K);
         if (!pressed)
             return;
+
+        // В воздухе удар идёт сверху вниз: на подъёме и на земле — обычный
+        // горизонтальный, в падении — ножом вниз. Проверка по скорости, а не
+        // по grounded: на самой вершине дуги grounded уже false, а героиня
+        // ещё летит вверх, и такой удар читался бы неправильно.
+        fallingStrike = !grounded
+                     && body.velocity.y < jumpFallSpeed
+                     && fallAttackFrames != null && fallAttackFrames.Length > 0;
 
         attacking = true;
         attackStartedAt = Time.time;
@@ -409,19 +436,27 @@ public class PlayerController : MonoBehaviour
         if (!attacking)
             return;
 
-        float t = (Time.time - attackStartedAt) / attackDuration;
-        if (t < hitWindow.x || t > hitWindow.y)
+        float dur = fallingStrike ? fallAttackDuration : attackDuration;
+        Vector2 win = fallingStrike ? fallHitWindow : hitWindow;
+        float t = (Time.time - attackStartedAt) / dur;
+        if (t < win.x || t > win.y)
             return;
 
+        // Удар при падении достаёт вниз и вперёд, поэтому хитбокс ниже,
+        // уже и вытянут по вертикали.
         Vector2 centre = (Vector2)transform.position
-                       + new Vector2(hitboxCenterX * face, hitboxCenterY);
-        Collider2D[] hits = Physics2D.OverlapBoxAll(centre, hitboxSize, 0f);
+                       + new Vector2((fallingStrike ? fallHitboxCenterX : hitboxCenterX) * face,
+                                     fallingStrike ? fallHitboxCenterY : hitboxCenterY);
+        Vector2 size = fallingStrike ? fallHitboxSize : hitboxSize;
+        int damage = fallingStrike ? fallAttackDamage : attackDamage;
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(centre, size, 0f);
         foreach (Collider2D h in hits)
         {
             Damageable target = TargetIn(h);
             if (target != null && hitThisSwing.Add(target))
             {
-                target.TakeHit(attackDamage, transform.position);
+                target.TakeHit(damage, transform.position);
                 if (fx != null) fx.Hit(centre, face);
             }
         }
@@ -429,6 +464,24 @@ public class PlayerController : MonoBehaviour
 
     void Animate(float move)
     {
+        // Удар при падении — раньше всего остального: в воздухе он важнее и
+        // кадров прыжка, и ходьбы, и прикрытия
+        if (attacking && fallingStrike
+            && fallAttackFrames != null && fallAttackFrames.Length > 0)
+        {
+            animTimer += Time.deltaTime;
+            int ff = (int)(animTimer / fallAttackDuration * fallAttackFrames.Length);
+            if (ff >= fallAttackFrames.Length)
+                ff = fallAttackFrames.Length - 1;
+            if (ff != shownFrame)
+            {
+                shownFrame = ff;
+                spriteRenderer.sprite = fallAttackFrames[ff];
+            }
+            spriteRenderer.flipX = face < 0f;
+            return;
+        }
+
         // Удар важнее ходьбы: пока он играется, кадры шага не показываем
         if (attacking && attackFrames != null && attackFrames.Length > 0)
         {
@@ -513,5 +566,9 @@ public class PlayerController : MonoBehaviour
         shownFrame = -1;
         dashTimer = 0f;
         slamPending = false;
+        // Без сброса флаг удара при падении пережил бы возрождение: мы
+        // появились бы на земле, а считали бы себя в воздухе.
+        attacking = false;
+        fallingStrike = false;
     }
 }

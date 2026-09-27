@@ -502,6 +502,8 @@ assert n == 1, f'спрайт героини: {n}'
 # Четыре кадра на тех же 12 fps дают 0.33 с ~= 0.9 роста — почти натура.
 JUMP = ['81278e73ff2cb55a9cdaa833e4ff2aab',     # взлёт: предплечья согнуты у груди
         'ca0867bd6fc2c7f48e720616b6c1516d']     # падение: руки в стороны, коса вверх
+FALL = ['3b4cf09e9f0204a0697c8009f9a9f630',      # замах в воздухе, нож уходит наверх
+        '997a6cc6a5ae2a1a65632ef80f4f9c77']      # удар вниз, клинок смотрит под ноги
 ATTACK = ['dc1783b3a5c9607e12c781b8f88ebef7',   # замах
           'e58d2f83e7543184b89c6ebf520dc6f6',   # выпад с ножом
           'be4bc24d2bc77d76f96772ae3e2efa11']   # возврат
@@ -542,6 +544,14 @@ s, n = re.subn(
         '  guardMoveScale: 0.3\n'
         '  attackFrames:\n' + '\n'.join(
             f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in ATTACK) + '\n'
+        '  fallAttackFrames:\n' + '\n'.join(
+            f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in FALL) + '\n'
+        '  fallAttackDuration: 0.34\n'
+        '  fallAttackDamage: 2\n'
+        '  fallHitboxCenterX: 0.5\n'
+        '  fallHitboxCenterY: 0.35\n'
+        '  fallHitboxSize: {x: 1.1, y: 1.6}\n'
+        '  fallHitWindow: {x: 0.25, y: 0.8}\n'
         '  attackDuration: 0.32\n  attackCooldown: 0.1\n'
         '  attackMoveScale: 0.35\n  attackDamage: 1\n'
         '  hitboxCenterX: 0.85\n  hitboxCenterY: 0.95\n'
