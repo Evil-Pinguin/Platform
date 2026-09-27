@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Платформер: ходьба с разгоном, прыжок, анимация шага и респавн при падении.
+// Платформер: ходьба с разгоном, прыжок, удар ножом и пять способностей.
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(SpriteRenderer))]
 public class PlayerController : MonoBehaviour
@@ -20,14 +20,6 @@ public class PlayerController : MonoBehaviour
     public float coyoteTime = 0.1f;
     [Tooltip("Сколько нажатие прыжка ждёт приземления — буфер ввода")]
     public float jumpBuffer = 0.12f;
-
-    [Header("Анимация")]
-    [Tooltip("Кадры ходьбы по порядку (нарисованы лицом вправо)")]
-    public Sprite[] walkFrames;
-    [Tooltip("Сколько кадров ходьбы показывать в секунду")]
-    public float walkFps = 12f;
-    [Tooltip("Спрайт, когда героиня стоит на месте")]
-    public Sprite idleSprite;
 
     [Header("Атака")]
     [Tooltip("Кадры удара по порядку (нарисованы лицом вправо)")]
@@ -50,6 +42,34 @@ public class PlayerController : MonoBehaviour
     [Tooltip("С какой доли удара и до какой хитбокс живой, 0…1")]
     public Vector2 hitWindow = new Vector2(0.3f, 0.7f);
 
+    [Header("Способности")]
+    [Tooltip("Какая способность выбрана сейчас: 0 рывок, 1 вихрь, 2 волна, 3 рывок с ударом, 4 двойной прыжок")]
+    public int selectedAbility = 0;
+    [Tooltip("Перезарядка каждой способности, секунды")]
+    public float[] abilityCooldowns = { 0.9f, 1.6f, 3.0f, 2.0f, 0.6f };
+    [Tooltip("Остаток перезарядки — заполняется в игре, не править")]
+    public float[] abilityReady = { 0f, 0f, 0f, 0f, 0f };
+    [Tooltip("Радиус вихря, юниты")]
+    public float spinRadius = 1.7f;
+    [Tooltip("Дальность волны по земле, юниты")]
+    public float shockRange = 3.5f;
+    [Tooltip("Скорость рывка, юниты в секунду")]
+    public float dashSpeed = 14f;
+    [Tooltip("Сколько длится рывок, секунды")]
+    public float dashTime = 0.18f;
+    [Tooltip("Урон рывка с ударом")]
+    public int dashDamage = 2;
+    [Tooltip("Высота двойного прыжка, юниты")]
+    public float doubleJumpHeight = 1.5f;
+
+    [Header("Анимация")]
+    [Tooltip("Кадры ходьбы по порядку (нарисованы лицом вправо)")]
+    public Sprite[] walkFrames;
+    [Tooltip("Сколько кадров ходьбы показывать в секунду")]
+    public float walkFps = 12f;
+    [Tooltip("Спрайт, когда героиня стоит на месте")]
+    public Sprite idleSprite;
+
     [Header("Если упала с края")]
     [Tooltip("Ниже этой высоты героиня возвращается в точку старта")]
     public float respawnBelowY = -12f;
@@ -61,6 +81,11 @@ public class PlayerController : MonoBehaviour
     float animTimer;
     int shownFrame = -1;
     bool grounded;
+    bool airJumpUsed;
+    bool slamPending;
+    float dashTimer;
+    float dashDir = 1f;
+    int dashHit;
     float lastGroundedTime = -99f;
     float jumpPressedAt = -99f;
     float jumpStartedAt = -99f;
@@ -68,6 +93,12 @@ public class PlayerController : MonoBehaviour
     bool attacking;
     readonly System.Collections.Generic.HashSet<Damageable> hitThisSwing =
         new System.Collections.Generic.HashSet<Damageable>();
+    readonly System.Collections.Generic.HashSet<Damageable> hitThisDash =
+        new System.Collections.Generic.HashSet<Damageable>();
+
+    // Способности для HUD: название, клавиша выбора, урон
+    public static readonly string[] AbilityNames =
+        { "Рывок", "Вихрь", "Волна", "Рывок с ударом", "Двойной прыжок" };
 
     void Awake()
     {
@@ -85,12 +116,30 @@ public class PlayerController : MonoBehaviour
         UpdateGrounded();
         ReadJumpInput();
         ReadAttackInput();
+        ReadAbilityInput();
 
         float speed = attacking ? moveSpeed * attackMoveScale : moveSpeed;
         float vx = body.velocity.x;
-        body.velocity = new Vector2(
-            Mathf.MoveTowards(vx, move * speed, acceleration * Time.deltaTime),
-            body.velocity.y);
+
+        if (dashTimer > 0f)
+        {
+            // рывок не даёт разгону мешать: скорость жёстко задана
+            dashTimer -= Time.deltaTime;
+            vx = dashDir * dashSpeed;
+            DashHit();
+        }
+        else
+        {
+            vx = Mathf.MoveTowards(vx, move * speed, acceleration * Time.deltaTime);
+        }
+
+        body.velocity = new Vector2(vx, body.velocity.y);
+
+        if (slamPending && grounded)
+        {
+            slamPending = false;
+            Shockwave();
+        }
 
         Animate(move);
         UpdateAttackHit();
@@ -103,7 +152,10 @@ public class PlayerController : MonoBehaviour
         Vector2 from = (Vector2)transform.position + Vector2.up * 0.15f;
         bool nowGrounded = Physics2D.Raycast(from, Vector2.down, 0.3f);
         if (nowGrounded && !grounded)
+        {
             lastGroundedTime = Time.time;
+            airJumpUsed = false;      // двойной прыжок снова доступен
+        }
         grounded = nowGrounded;
     }
 
@@ -124,8 +176,7 @@ public class PlayerController : MonoBehaviour
         bool canJump = grounded || Time.time - lastGroundedTime <= coyoteTime;
         if (wantsJump && canJump && body.velocity.y <= 0.01f)
         {
-            float g = Mathf.Abs(Physics2D.gravity.y) * body.gravityScale;
-            body.velocity = new Vector2(body.velocity.x, Mathf.Sqrt(2f * g * jumpHeight));
+            Launch(jumpHeight);
             jumpPressedAt = -99f;
             jumpStartedAt = Time.time;
             lastGroundedTime = -99f;   // coyote сгорел, второй раз не прыгнуть
@@ -139,8 +190,12 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // Удар: левая кнопка мыши, J или K. Повторно нельзя, пока не
-    // отыграл удар и не прошёл откат.
+    void Launch(float height)
+    {
+        float g = Mathf.Abs(Physics2D.gravity.y) * body.gravityScale;
+        body.velocity = new Vector2(body.velocity.x, Mathf.Sqrt(2f * g * height));
+    }
+
     void ReadAttackInput()
     {
         if (attacking)
@@ -168,6 +223,111 @@ public class PlayerController : MonoBehaviour
         hitThisSwing.Clear();
         animTimer = 0f;
         shownFrame = -1;
+    }
+
+    void ReadAbilityInput()
+    {
+        for (int i = 0; i < abilityReady.Length; i++)
+            if (abilityReady[i] > 0f)
+                abilityReady[i] = Mathf.Max(0f, abilityReady[i] - Time.deltaTime);
+
+        // выбор способности: клавиши 1…5
+        for (int i = 0; i < 5; i++)
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                selectedAbility = i;
+
+        // применение: K или F
+        if (Input.GetKeyDown(KeyCode.F))
+            UseAbility();
+    }
+
+    void UseAbility()
+    {
+        int s = Mathf.Clamp(selectedAbility, 0, abilityReady.Length - 1);
+        if (abilityReady[s] > 0f)
+            return;
+
+        switch (s)
+        {
+            case 0:     // рывок
+                dashDir = face;
+                dashTimer = dashTime;
+                dashHit = 0;
+                hitThisDash.Clear();
+                break;
+
+            case 1:     // вихрь
+                HitAround(transform.position, spinRadius, 1);
+                break;
+
+            case 2:     // удар о землю
+                slamPending = true;
+                body.velocity = new Vector2(body.velocity.x * 0.3f, 3.5f);
+                break;
+
+            case 3:     // рывок с ударом
+                dashDir = face;
+                dashTimer = dashTime * 1.4f;
+                dashHit = dashDamage;
+                hitThisDash.Clear();
+                break;
+
+            case 4:     // двойной прыжок — только в воздухе
+                if (grounded || airJumpUsed)
+                    return;
+                airJumpUsed = true;
+                Launch(doubleJumpHeight);
+                break;
+        }
+
+        abilityReady[s] = abilityCooldowns[s];
+    }
+
+    void HitAround(Vector2 centre, float radius, int damage)
+    {
+        Collider2D[] hits = Physics2D.OverlapCircleAll(centre, radius);
+        foreach (Collider2D h in hits)
+        {
+            Damageable target = h.GetComponent<Damageable>()
+                             ?? h.GetComponentInParent<Damageable>();
+            if (target == null || !target.IsAlive)
+                continue;
+            target.TakeHit(damage, centre);
+        }
+    }
+
+    // Волна ползёт по земле в обе стороны, как от удара оземь
+    void Shockwave()
+    {
+        Collider2D[] hits = Physics2D.OverlapBoxAll(
+            transform.position, new Vector2(shockRange * 2f, 0.8f), 0f);
+        foreach (Collider2D h in hits)
+        {
+            Damageable target = h.GetComponent<Damageable>()
+                             ?? h.GetComponentInParent<Damageable>();
+            if (target == null || !target.IsAlive)
+                continue;
+            target.TakeHit(1, transform.position);
+        }
+    }
+
+    // Всё, что оказалось на пути рывка, получает урон по одному разу
+    void DashHit()
+    {
+        if (dashHit <= 0)
+            return;
+        Collider2D[] hits = Physics2D.OverlapBoxAll(
+            transform.position + new Vector3(0f, 0.9f, 0f),
+            new Vector2(1.8f, 1.6f), 0f);
+        foreach (Collider2D h in hits)
+        {
+            Damageable target = h.GetComponent<Damageable>()
+                             ?? h.GetComponentInParent<Damageable>();
+            if (target == null || !target.IsAlive)
+                continue;
+            if (hitThisDash.Add(target))
+                target.TakeHit(dashHit, transform.position);
+        }
     }
 
     // Хитбокс живёт только в окне удара. Проверяем оверлапом, а не
@@ -253,5 +413,7 @@ public class PlayerController : MonoBehaviour
         body.velocity = Vector2.zero;
         animTimer = 0f;
         shownFrame = -1;
+        dashTimer = 0f;
+        slamPending = false;
     }
 }

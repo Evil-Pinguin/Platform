@@ -17,9 +17,11 @@
 import re
 
 SCENE = 'Assets/Scenes/TestLevel.unity'
+HUD_SCRIPT = 'e23ad8f0be0dfe87943e7b9135870f82'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
 BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
+HUD_GO, HUD_TR, HUD_SCRIPT_ID = 420000001, 420000002, 420000003
 DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
 SERGE_GUID = 'dfefd0bca0374f584c131084affd95aa'
 DECOR = {
@@ -207,6 +209,14 @@ DECOR_ITEMS = [
 ]
 
 
+def script(sid, gid, guid, extra):
+    return (f"--- !u!114 &{sid}\nMonoBehaviour:\n" + COMMON_HEAD +
+            f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
+            "  m_EditorHideFlags: 0\n"
+            f"  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n"
+            "  m_Name: \n  m_EditorClassIdentifier: \n" + extra)
+
+
 def dummy(gid, name, x, top, health, order):
     """Резной столб-мишень: спрайт сергэ, сплошной коллайдер, Damageable."""
     guid, pw, ph, ppu = DECOR['serge_pole']
@@ -236,7 +246,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25'):
+for prefix in ('21', '22', '23', '24', '25', '42'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -295,6 +305,11 @@ for i, (name, x, top, health) in enumerate(DUMMIES):
     blocks += dummy(250000000 + i * 10, name, x, top, health, order)
     order += 1
 
+# --- панель способностей прямо на героине, отдельный объект не нужен
+blocks.append(gameobject(HUD_GO, 'AbilityHud', [HUD_TR, HUD_SCRIPT_ID], 0))
+blocks.append(transform(HUD_TR, HUD_GO, (0, 0, 0), 0, father=400000002))
+blocks.append(script(HUD_SCRIPT_ID, HUD_GO, HUD_SCRIPT, '  scale: 1\n'))
+
 s = s.rstrip('\n') + '\n' + '\n'.join(blocks)
 
 # --- героиня на старте поляны
@@ -341,6 +356,11 @@ s, n = re.subn(
         '  moveSpeed: 5\n  acceleration: 70\n'
         '  jumpHeight: 2.2\n  jumpHoldTime: 0.16\n  coyoteTime: 0.1\n'
         '  jumpBuffer: 0.12\n'
+        '  selectedAbility: 0\n'
+        '  abilityCooldowns:\n  - 0.9\n  - 1.6\n  - 3\n  - 2\n  - 0.6\n'
+        '  abilityReady:\n  - 0\n  - 0\n  - 0\n  - 0\n  - 0\n'
+        '  spinRadius: 1.7\n  shockRange: 3.5\n  dashSpeed: 14\n'
+        '  dashTime: 0.18\n  dashDamage: 2\n  doubleJumpHeight: 1.5\n'
         '  walkFrames:\n' + frames + '\n'
         '  walkFps: 12\n'
         '  idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}\n'
