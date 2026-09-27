@@ -18,6 +18,8 @@ public class WindFx : MonoBehaviour
     public int hitBurst = 16;
     [Tooltip("Всплеск при применении способности, частиц")]
     public int abilityBurst = 30;
+    [Tooltip("Пыль из-под ног за секунду спринта, частиц")]
+    public int sprintDustRate = 40;
 
     [Header("Цвета ветра")]
     public Color windColor = new Color(0.85f, 0.93f, 1f, 0.9f);
@@ -62,6 +64,19 @@ public class WindFx : MonoBehaviour
     }
 
     // --- вызовы из контроллера -------------------------------------------------
+
+    // Пыль из-под ног на спринте. Копится дробью: пока держишь Shift,
+    // подошва сыпет мелкую взвесь, и по земле видно, что она несётся.
+    float sprintCarry;
+    public void SprintDust(float dt)
+    {
+        sprintCarry += sprintDustRate * dt;
+        int whole = (int)sprintCarry;
+        if (whole <= 0)
+            return;
+        sprintCarry -= whole;
+        Emit(burst, Mathf.Min(whole, 6));
+    }
 
     public void Dash(float direction)
     {

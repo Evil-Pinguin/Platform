@@ -413,6 +413,10 @@ s, n = re.subn(
     r'(?:(?!--- !u!).)*',
     lambda m: (m.group(1) +
         '  moveSpeed: 5\n  acceleration: 70\n'
+        '  sprintMultiplier: 1.7\n  sprintDuration: 3.2\n'
+        '  staminaRecoverTime: 6\n  sprintAccelerationBonus: 1.6\n'
+        '  sprintRestartAt: 0.3\n  sprintRecoil: 0.25\n'
+        '  sprintLockAfterLand: 0.18\n'
         '  jumpHeight: 2.2\n  jumpHoldTime: 0.16\n  coyoteTime: 0.1\n'
         '  jumpBuffer: 0.12\n'
         '  selectedAbility: 0\n'

@@ -360,6 +360,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   acceleration: 70
+  sprintMultiplier: 1.7
+  sprintDuration: 3.2
+  staminaRecoverTime: 6
+  sprintAccelerationBonus: 1.6
+  sprintRestartAt: 0.3
+  sprintRecoil: 0.25
+  sprintLockAfterLand: 0.18
   jumpHeight: 2.2
   jumpHoldTime: 0.16
   coyoteTime: 0.1
