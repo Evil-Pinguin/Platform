@@ -23,6 +23,7 @@ BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
 FX_GO, FX_TR, FX_SCRIPT = 440000001, 440000002, 440000003
 AMB_GO, AMB_TR, AMB_SCRIPT = 450000001, 450000002, 450000003
+IDLE_GUID = 'c46dd459691fd1dd598775d241a19a84'
 PARALLAX_GUID = '16471e47b8e5d5aa9ad83d7b78562c9c'
 TREE_GO, TREE_TR, TREE_SCRIPT = 460000001, 460000002, 460000003
 TRAIL_GO, TRAIL_TR, TRAIL_REND = 430000001, 430000002, 430000003
@@ -34,6 +35,10 @@ DECOR = {
     'rocks': ('b017c5b7638bea95aacc23fe69524e10', 348, 298, 384),
     'grass_tuft': ('5c2806664d4ba3f3f50b3741002bf34e', 309, 151, 256),
     'serge_pole': ('dfefd0bca0374f584c131084affd95aa', 161, 623, 256),
+    'lily': ('76322453d221141f89f1cbb255c6d91f', 341, 637, 400),
+    'lilies': ('6abdb613866b23b9b4e3eb024b21c8fd', 464, 599, 420),
+    'iris': ('dd7b4a1d458ab880b373f467639af009', 259, 642, 400),
+    'campion': ('16e75b7cffae3121ece545242bee023b', 497, 404, 300),
 }
 
 DECOR_TREE = {
@@ -218,6 +223,57 @@ DECOR_ITEMS = [
     ('serge_pole', -30.2, 0), ('serge_pole', -23.2, 1),
     ('serge_pole', -5.0, 0), ('serge_pole', 17.2, 1),
     ('serge_pole', 28.6, 0), ('serge_pole', 39.0, 1),
+    ('lily', -31.5, 0),
+    ('campion', -30.8, 1),
+    ('lilies', -29.4, 0),
+    ('iris', -28.7, 1),
+    ('lily', -27.9, 0),
+    ('campion', -26.9, 1),
+    ('lily', -25.6, 0),
+    ('iris', -24.8, 1),
+    ('lilies', -24.1, 0),
+    ('lily', -22.6, 1),
+    ('lily', -21.8, 0),
+    ('campion', -20.9, 1),
+    ('lilies', -20.2, 0),
+    ('iris', -19.4, 1),
+    ('lily', -17.0, 0),
+    ('campion', -16.2, 1),
+    ('lily', -15.4, 0),
+    ('iris', -14.5, 1),
+    ('lilies', -12.0, 0),
+    ('lily', -11.3, 1),
+    ('lily', -10.5, 0),
+    ('campion', -9.6, 1),
+    ('lilies', -7.1, 0),
+    ('iris', -6.3, 1),
+    ('lily', -5.4, 0),
+    ('campion', -4.6, 1),
+    ('lily', -3.7, 0),
+    ('iris', -2.9, 1),
+    ('lilies', -0.6, 0),
+    ('lily', 0.3, 1),
+    ('lily', 1.2, 0),
+    ('campion', 2.1, 1),
+    ('lilies', 4.4, 0),
+    ('iris', 5.3, 1),
+    ('lily', 6.2, 0),
+    ('campion', 7.1, 1),
+    ('lily', 8.1, 0),
+    ('iris', 14.9, 1),
+    ('lilies', 15.8, 0),
+    ('lily', 16.7, 1),
+    ('lily', 18.1, 0),
+    ('campion', 19.2, 1),
+    ('lilies', 27.9, 0),
+    ('iris', 28.3, 1),
+    ('lily', 31.0, 0),
+    ('campion', 32.1, 1),
+    ('lily', 35.0, 0),
+    ('iris', 36.1, 1),
+    ('lilies', 38.9, 0),
+    ('lily', 40.3, 1),
+    ('lily', 41.4, 0),
 ]
 
 
@@ -435,6 +491,14 @@ s, n = re.subn(r'(--- !u!114 &100000005\nMonoBehaviour:.*?  followY: )[01]',
                r'\g<1>1', s, flags=re.S)
 assert n == 1, f'followY: {n}'
 
+# --- рендерер героини помнит спрайт в самой сцене. После перегенерации
+# кадров там остаётся guid, которого больше нет, и Unity ругается
+# вслух. Подставляем живой кадр, чтобы консоль была чистой.
+s, n = re.subn(r'(--- !u!212 &400000003\nSpriteRenderer:.*?'
+                r'  m_Sprite: \{fileID: \d+, guid: )[0-9a-f]{32}',
+               r'\g<1>' + IDLE_GUID, s, flags=re.S)
+assert n == 1, f'спрайт героини: {n}'
+
 # --- конфигурация PlayerController
 # Цикл ходьбы — 4 кадра из восьми (каждый второй). Восемь кадров на
 # 12 fps давали цикл 0.67 с, то есть 1.78 роста пути за цикл: ноги
@@ -466,7 +530,8 @@ s, n = re.subn(
         '  doubleJumpHeight: 1.5\n'
         '  walkFrames:\n' + frames + '\n'
         '  walkFps: 9\n'
-        '  idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}\n'
+        '  idleSprite: {fileID: 21300000, guid: ' + IDLE_GUID
+        + ', type: 3}\n'
         '  attackFrames:\n' + '\n'.join(
             f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in ATTACK) + '\n'
         '  attackDuration: 0.32\n  attackCooldown: 0.1\n'
