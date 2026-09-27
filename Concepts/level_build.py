@@ -21,6 +21,7 @@ HUD_SCRIPT = 'e23ad8f0be0dfe87943e7b9135870f82'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
 BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
+TRAIL_GO, TRAIL_TR, TRAIL_REND = 430000001, 430000002, 430000003
 HUD_GO, HUD_TR, HUD_SCRIPT_ID = 420000001, 420000002, 420000003
 DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
 SERGE_GUID = 'dfefd0bca0374f584c131084affd95aa'
@@ -209,6 +210,40 @@ DECOR_ITEMS = [
 ]
 
 
+def trail_renderer():
+    """Лента ветра за спиной на рывке. Материал — Sprites/Default, он берёт
+    цвет из вершин, так что лента выйдет бледно-голубой и прозрачной."""
+    return ("--- !u!96 &%d\nTrailRenderer:\n" % TRAIL_REND + COMMON_HEAD +
+            "  m_GameObject: {fileID: %d}\n  m_Enabled: 1\n" % TRAIL_GO +
+            "  m_CastShadows: 0\n  m_ReceiveShadows: 0\n  m_DynamicOccludee: 1\n"
+            "  m_MotionVectors: 1\n  m_LightProbeUsage: 1\n"
+            "  m_ReflectionProbeUsage: 1\n  m_RayTracingMode: 2\n"
+            "  m_RayTraceProcedural: 1\n  m_RenderingLayerMask: 1\n"
+            "  m_RendererPriority: 0\n  m_SortingLayerID: 0\n"
+            "  m_SortingOrder: 1.5\n"
+            "  m_Materials:\n  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}\n"
+            "  m_StaticBatchInfo:\n    firstSubMesh: 0\n    subMeshCount: 0\n"
+            "  m_StaticBatchRoot: {fileID: 0}\n  m_ProbeAnchor: {fileID: 0}\n"
+            "  m_LightProbeVolumeOverride: {fileID: 0}\n  m_ScaleInLightmap: 1\n"
+            "  m_ReceiveGI: 1\n  m_PreserveUVs: 0\n"
+            "  m_IgnoreNormalsForChartDetection: 0\n  m_ImportantGI: 0\n"
+            "  m_StitchLightmapSeams: 1\n  m_SelectedEditorRenderState: 3\n"
+            "  m_MinimumChartSize: 4\n  m_AbsoluteSize: 0\n"
+            "  time: 0.45\n  startDistance: 0\n"
+            "  startColor: {r: 0.85, g: 0.93, b: 1, a: 0.75}\n"
+            "  endColor: {r: 0.8, g: 0.9, b: 1, a: 0}\n"
+            "  minVertexDistance: 0.15\n  autodestruct: 0\n"
+            "  emission: {x: 0, y: 0}\n  length: 4\n  offset: {x: 0, y: 0}\n"
+            "  m_ColorGradient:\n    serializedVersion: 2\n"
+            "    key0: {r: 0.85, g: 0.93, b: 1, a: 0.85}\n"
+            "    key1: {r: 0.8, g: 0.9, b: 1, a: 0}\n"
+            "    key2: {r: 0, g: 0, b: 0, a: 0}\n    key3: {r: 0, g: 0, b: 0, a: 0}\n"
+            "    key4: {r: 0, g: 0, b: 0, a: 0}\n    key5: {r: 0, g: 0, b: 0, a: 0}\n"
+            "    key6: {r: 0, g: 0, b: 0, a: 0}\n    key7: {r: 0, g: 0, b: 0, a: 0}\n"
+            "    numColorKeys: 2\n    numAlphaKeys: 4\n    gradientMode: 0\n"
+            "    colorSpace: 0\n  m_Enabled_: 0\n")
+
+
 def script(sid, gid, guid, extra):
     return (f"--- !u!114 &{sid}\nMonoBehaviour:\n" + COMMON_HEAD +
             f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
@@ -246,7 +281,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25', '42'):
+for prefix in ('21', '22', '23', '24', '25', '42', '43'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -305,6 +340,11 @@ for i, (name, x, top, health) in enumerate(DUMMIES):
     blocks += dummy(250000000 + i * 10, name, x, top, health, order)
     order += 1
 
+# --- лента ветра: дочерний объект героини, тянется только на рывке
+blocks.append(gameobject(TRAIL_GO, 'DashTrail', [TRAIL_TR, TRAIL_REND], 0))
+blocks.append(transform(TRAIL_TR, TRAIL_GO, (0, 0.9, 0.3), 0, father=400000002))
+blocks.append(trail_renderer())
+
 # --- панель способностей прямо на героине, отдельный объект не нужен
 blocks.append(gameobject(HUD_GO, 'AbilityHud', [HUD_TR, HUD_SCRIPT_ID], 0))
 blocks.append(transform(HUD_TR, HUD_GO, (0, 0, 0), 0, father=400000002))
@@ -360,7 +400,10 @@ s, n = re.subn(
         '  abilityCooldowns:\n  - 0.9\n  - 1.6\n  - 3\n  - 2\n  - 0.6\n'
         '  abilityReady:\n  - 0\n  - 0\n  - 0\n  - 0\n  - 0\n'
         '  spinRadius: 1.7\n  shockRange: 3.5\n  dashSpeed: 14\n'
-        '  dashTime: 0.18\n  dashDamage: 2\n  doubleJumpHeight: 1.5\n'
+        '  dashTime: 0.18\n  dashDamage: 2\n'
+        '  dashFloat: 1\n  dashFade: 0.35\n'
+        '  trail: {fileID: 430000003}\n'
+        '  doubleJumpHeight: 1.5\n'
         '  walkFrames:\n' + frames + '\n'
         '  walkFps: 12\n'
         '  idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}\n'

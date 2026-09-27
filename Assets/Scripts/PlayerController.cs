@@ -59,6 +59,13 @@ public class PlayerController : MonoBehaviour
     public float dashTime = 0.18f;
     [Tooltip("Урон рывка с ударом")]
     public int dashDamage = 2;
+    [Tooltip("Рывок висит в воздухе, гравитация не тянет вниз")]
+    public bool dashFloat = true;
+    [Tooltip("Насколько бледнеет героиня на рывке — «растворяется в ветре»")]
+    [Range(0f, 1f)]
+    public float dashFade = 0.35f;
+    [Tooltip("Лента ветра за спиной. Если пусто — просто гаснет")]
+    public TrailRenderer trail;
     [Tooltip("Высота двойного прыжка, юниты")]
     public float doubleJumpHeight = 1.5f;
 
@@ -86,6 +93,7 @@ public class PlayerController : MonoBehaviour
     float dashTimer;
     float dashDir = 1f;
     int dashHit;
+    bool dashFloating = true;
     float lastGroundedTime = -99f;
     float jumpPressedAt = -99f;
     float jumpStartedAt = -99f;
@@ -98,7 +106,7 @@ public class PlayerController : MonoBehaviour
 
     // Способности для HUD: название, клавиша выбора, урон
     public static readonly string[] AbilityNames =
-        { "Рывок", "Вихрь", "Волна", "Рывок с ударом", "Двойной прыжок" };
+        { "Рывок ветра", "Вихрь", "Волна", "Рывок с ударом", "Двойной прыжок" };
 
     void Awake()
     {
@@ -121,11 +129,14 @@ public class PlayerController : MonoBehaviour
         float speed = attacking ? moveSpeed * attackMoveScale : moveSpeed;
         float vx = body.velocity.x;
 
+        float vy = body.velocity.y;
         if (dashTimer > 0f)
         {
             // рывок не даёт разгону мешать: скорость жёстко задана
             dashTimer -= Time.deltaTime;
             vx = dashDir * dashSpeed;
+            if (dashFloating)
+                vy = 0f;              // несёт ветром, вниз не тянет
             DashHit();
         }
         else
@@ -133,7 +144,18 @@ public class PlayerController : MonoBehaviour
             vx = Mathf.MoveTowards(vx, move * speed, acceleration * Time.deltaTime);
         }
 
-        body.velocity = new Vector2(vx, body.velocity.y);
+        body.velocity = new Vector2(vx, vy);
+
+        // «растворяется в ветре»: на рывке фигура бледнеет и тянет ленту
+        Color tint = spriteRenderer.color;
+        float want = dashTimer > 0f ? dashFade : 1f;
+        if (!Mathf.Approximately(tint.a, want))
+        {
+            tint.a = want;
+            spriteRenderer.color = tint;
+        }
+        if (trail != null)
+            trail.emitting = dashTimer > 0f;
 
         if (slamPending && grounded)
         {
@@ -249,10 +271,11 @@ public class PlayerController : MonoBehaviour
 
         switch (s)
         {
-            case 0:     // рывок
+            case 0:     // рывок ветра
                 dashDir = face;
                 dashTimer = dashTime;
                 dashHit = 0;
+                dashFloating = dashFloat;
                 hitThisDash.Clear();
                 break;
 
@@ -265,10 +288,11 @@ public class PlayerController : MonoBehaviour
                 body.velocity = new Vector2(body.velocity.x * 0.3f, 3.5f);
                 break;
 
-            case 3:     // рывок с ударом
+            case 3:     // рывок с ударом — прижата к земле, не парит
                 dashDir = face;
                 dashTimer = dashTime * 1.4f;
                 dashHit = dashDamage;
+                dashFloating = false;
                 hitThisDash.Clear();
                 break;
 
