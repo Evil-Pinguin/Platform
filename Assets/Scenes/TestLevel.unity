@@ -385,6 +385,7 @@ MonoBehaviour:
   dashFloat: 1
   dashFade: 0.35
   trail: {fileID: 430000003}
+  fx: {fileID: 440000003}
   doubleJumpHeight: 1.5
   walkFrames:
   - {fileID: 21300000, guid: 7a2d62ffd4fe461990b64ffe293dc930, type: 3}
@@ -7351,6 +7352,111 @@ TrailRenderer:
     colorSpace: 0
   m_Enabled_: 0
 
+--- !u!1 &440000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 440000002}
+  - component: {fileID: 440000003}
+  m_Layer: 0
+  m_Name: WindFx
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+
+--- !u!4 &440000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 440000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 400000002}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+
+--- !u!114 &440000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 440000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2baeea3bce673ac5869a207e136037c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  landBurst: 14
+  jumpBurst: 9
+  dashBurst: 26
+  hitBurst: 16
+  abilityBurst: 30
+  windColor: {r: 0.85, g: 0.93, b: 1, a: 0.9}
+  dustColor: {r: 0.82, g: 0.78, b: 0.7, a: 0.8}
+
+--- !u!1 &450000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 450000002}
+  - component: {fileID: 450000003}
+  m_Layer: 0
+  m_Name: WindAmbient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+
+--- !u!4 &450000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 450000001}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+
+--- !u!114 &450000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 450000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8891b150c3db614edd45c4596488161f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  area: {x: 84, y: 15}
+  centre: {x: 5, y: 6}
+  count: 150
+  drift: 0.9
+  size: {x: 0.04, y: 0.15}
+  tint: {r: 1, g: 0.98, b: 0.94, a: 0.55}
+
 --- !u!1 &420000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -7403,6 +7509,7 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 100000001}
+  - {fileID: 450000001}
   - {fileID: 400000001}
   - {fileID: 210000000}
   - {fileID: 210000010}

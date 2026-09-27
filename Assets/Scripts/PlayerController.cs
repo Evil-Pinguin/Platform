@@ -66,6 +66,8 @@ public class PlayerController : MonoBehaviour
     public float dashFade = 0.35f;
     [Tooltip("Лента ветра за спиной. Если пусто — просто гаснет")]
     public TrailRenderer trail;
+    [Tooltip("Частицы: порывы, пыль, всплески. Если пусто — просто не видно")]
+    public WindFx fx;
     [Tooltip("Высота двойного прыжка, юниты")]
     public float doubleJumpHeight = 1.5f;
 
@@ -104,7 +106,13 @@ public class PlayerController : MonoBehaviour
     readonly System.Collections.Generic.HashSet<Damageable> hitThisDash =
         new System.Collections.Generic.HashSet<Damageable>();
 
-    // Способности для HUD: название, клавиша выбора, урон
+    // Идёт ли сейчас рывок: на этом держится и лента, и след из частиц
+    public bool DashActive
+    {
+        get { return dashTimer > 0f; }
+    }
+
+    // Способности для HUD: название, клавича выбора, урон
     public static readonly string[] AbilityNames =
         { "Рывок ветра", "Вихрь", "Волна", "Рывок с ударом", "Двойной прыжок" };
 
@@ -177,6 +185,7 @@ public class PlayerController : MonoBehaviour
         {
             lastGroundedTime = Time.time;
             airJumpUsed = false;      // двойной прыжок снова доступен
+            if (fx != null) fx.Land();
         }
         grounded = nowGrounded;
     }
@@ -216,6 +225,7 @@ public class PlayerController : MonoBehaviour
     {
         float g = Mathf.Abs(Physics2D.gravity.y) * body.gravityScale;
         body.velocity = new Vector2(body.velocity.x, Mathf.Sqrt(2f * g * height));
+        if (fx != null) fx.Jump();
     }
 
     void ReadAttackInput()
@@ -277,6 +287,7 @@ public class PlayerController : MonoBehaviour
                 dashHit = 0;
                 dashFloating = dashFloat;
                 hitThisDash.Clear();
+                if (fx != null) fx.Dash(dashDir);
                 break;
 
             case 1:     // вихрь
@@ -304,6 +315,7 @@ public class PlayerController : MonoBehaviour
                 break;
         }
 
+        if (fx != null) fx.Ability();
         abilityReady[s] = abilityCooldowns[s];
     }
 
@@ -354,7 +366,10 @@ public class PlayerController : MonoBehaviour
         {
             Damageable target = TargetIn(h);
             if (target != null && hitThisDash.Add(target))
+            {
                 target.TakeHit(dashHit, transform.position);
+                if (fx != null) fx.Hit(target.transform.position, dashDir);
+            }
         }
     }
 
@@ -379,7 +394,10 @@ public class PlayerController : MonoBehaviour
         {
             Damageable target = TargetIn(h);
             if (target != null && hitThisSwing.Add(target))
+            {
                 target.TakeHit(attackDamage, transform.position);
+                if (fx != null) fx.Hit(centre, face);
+            }
         }
     }
 

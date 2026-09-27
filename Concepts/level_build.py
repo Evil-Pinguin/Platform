@@ -21,6 +21,8 @@ HUD_SCRIPT = 'e23ad8f0be0dfe87943e7b9135870f82'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
 BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
+FX_GO, FX_TR, FX_SCRIPT = 440000001, 440000002, 440000003
+AMB_GO, AMB_TR, AMB_SCRIPT = 450000001, 450000002, 450000003
 TRAIL_GO, TRAIL_TR, TRAIL_REND = 430000001, 430000002, 430000003
 HUD_GO, HUD_TR, HUD_SCRIPT_ID = 420000001, 420000002, 420000003
 DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
@@ -281,7 +283,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25', '42', '43'):
+for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -345,6 +347,23 @@ blocks.append(gameobject(TRAIL_GO, 'DashTrail', [TRAIL_TR, TRAIL_REND], 0))
 blocks.append(transform(TRAIL_TR, TRAIL_GO, (0, 0.9, 0.3), 0, father=400000002))
 blocks.append(trail_renderer())
 
+# --- частицы ветра: дочерний объект героини
+blocks.append(gameobject(FX_GO, 'WindFx', [FX_TR, FX_SCRIPT], 0))
+blocks.append(transform(FX_TR, FX_GO, (0, 0, 0), 0, father=400000002))
+blocks.append(script(FX_SCRIPT, FX_GO, '2baeea3bce673ac5869a207e136037c5',
+    '  landBurst: 14\n  jumpBurst: 9\n  dashBurst: 26\n'
+    '  hitBurst: 16\n  abilityBurst: 30\n'
+    '  windColor: {r: 0.85, g: 0.93, b: 1, a: 0.9}\n'
+    '  dustColor: {r: 0.82, g: 0.78, b: 0.7, a: 0.8}\n'))
+
+# --- взвесь по всему уровню, корневой объект
+blocks.append(gameobject(AMB_GO, 'WindAmbient', [AMB_TR, AMB_SCRIPT], 0))
+blocks.append(transform(AMB_TR, AMB_GO, (0, 0, 0), 0))
+blocks.append(script(AMB_SCRIPT, AMB_GO, '8891b150c3db614edd45c4596488161f',
+    '  area: {x: 84, y: 15}\n  centre: {x: 5, y: 6}\n'
+    '  count: 150\n  drift: 0.9\n  size: {x: 0.04, y: 0.15}\n'
+    '  tint: {r: 1, g: 0.98, b: 0.94, a: 0.55}\n'))
+
 # --- панель способностей прямо на героине, отдельный объект не нужен
 blocks.append(gameobject(HUD_GO, 'AbilityHud', [HUD_TR, HUD_SCRIPT_ID], 0))
 blocks.append(transform(HUD_TR, HUD_GO, (0, 0, 0), 0, father=400000002))
@@ -403,6 +422,7 @@ s, n = re.subn(
         '  dashTime: 0.18\n  dashDamage: 2\n'
         '  dashFloat: 1\n  dashFade: 0.35\n'
         '  trail: {fileID: 430000003}\n'
+        '  fx: {fileID: 440000003}\n'
         '  doubleJumpHeight: 1.5\n'
         '  walkFrames:\n' + frames + '\n'
         '  walkFps: 12\n'
