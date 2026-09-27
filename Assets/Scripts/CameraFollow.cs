@@ -18,6 +18,12 @@ public class CameraFollow : MonoBehaviour
     void Start()
     {
         startY = transform.position.y;
+        // сразу встаём на цель, иначе в начале игры камера секунду едет
+        // через весь уровень и в кадре пусто
+        if (target != null)
+            transform.position = new Vector3(target.position.x + offset.x,
+                                             target.position.y + offset.y,
+                                             transform.position.z);
     }
 
     void LateUpdate()

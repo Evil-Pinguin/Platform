@@ -272,6 +272,14 @@ s, n = re.subn(r'(--- !u!4 &400000002\nTransform:.*?  m_LocalPosition: )'
                s, flags=re.S)
 assert n == 1, f'позиция героини: {n}'
 
+# --- в сохранённой сцене камера стоит на старте: иначе, открыв сцену
+# без Play, видишь пустоту там, где камера сохранена
+s, n = re.subn(r'(--- !u!4 &100000002\nTransform:.*?  m_LocalPosition: )'
+               r'\{x: [-\d.]+, y: [-\d.]+, z: [-\d.]+\}',
+               lambda m: m.group(1) + f'{{x: {START_X}, y: {HERO_Y + 1.0}, z: -10}}',
+               s, flags=re.S)
+assert n == 1, f'позиция камеры: {n}'
+
 # --- камера следит и по вертикали
 s, n = re.subn(r'(--- !u!114 &100000005\nMonoBehaviour:.*?  offset: )\{x: [-\d.]+, y: [-\d.]+\}',
                r'\g<1>{x: 0, y: -0.3}', s, flags=re.S)
