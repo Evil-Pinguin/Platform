@@ -33,7 +33,7 @@ import re
 import subprocess
 from collections import deque
 
-SHEET = 'Concepts/attack/fall_sheet_v1a.png'
+SHEET = 'Concepts/attack/fall_sheet_v2a.png'
 OUT_DIR = 'Assets/Art/Heroine/Attack'
 META_TPL = 'Assets/Art/Heroine/Attack/attack_1.png.meta'
 CANVAS_W, CANVAS_H = 560, 512
