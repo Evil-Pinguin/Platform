@@ -445,10 +445,9 @@ ATTACK = ['dc1783b3a5c9607e12c781b8f88ebef7',   # замах
           'be4bc24d2bc77d76f96772ae3e2efa11']   # возврат
 frames = '\n'.join(
     f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in
-    ['7a2d62ffd4fe461990b64ffe293dc930',   # walk_1 — контакт
-     '164fb7696ad34f3a9910630351b6bf06',   # walk_3
-     '90b168f17df94355a5c63298da7e1f43',   # walk_5
-     '1ae4d6901c194c62a2e0e62b49e6a309'])  # walk_7
+    ['fbb4210db713f8fb5cdae1e8920be5b8',   # walk_1 — контакт, передняя рука вперёд
+     'c46dd459691fd1dd598775d241a19a84',   # walk_2 — пронос, обе руки опущены
+     '30d934941ae7437c05aed5354e92af3f'])  # walk_3 — второй контакт, руки наоборот
 s, n = re.subn(
     r'(--- !u!114 &400000006\nMonoBehaviour:.*?  m_EditorClassIdentifier: \n)'
     r'(?:(?!--- !u!).)*',
@@ -466,7 +465,7 @@ s, n = re.subn(
         '  fx: {fileID: 440000003}\n'
         '  doubleJumpHeight: 1.5\n'
         '  walkFrames:\n' + frames + '\n'
-        '  walkFps: 12\n'
+        '  walkFps: 9\n'
         '  idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}\n'
         '  attackFrames:\n' + '\n'.join(
             f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in ATTACK) + '\n'

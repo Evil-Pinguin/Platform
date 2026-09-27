@@ -388,11 +388,10 @@ MonoBehaviour:
   fx: {fileID: 440000003}
   doubleJumpHeight: 1.5
   walkFrames:
-  - {fileID: 21300000, guid: 7a2d62ffd4fe461990b64ffe293dc930, type: 3}
-  - {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}
-  - {fileID: 21300000, guid: 90b168f17df94355a5c63298da7e1f43, type: 3}
-  - {fileID: 21300000, guid: 1ae4d6901c194c62a2e0e62b49e6a309, type: 3}
-  walkFps: 12
+  - {fileID: 21300000, guid: fbb4210db713f8fb5cdae1e8920be5b8, type: 3}
+  - {fileID: 21300000, guid: c46dd459691fd1dd598775d241a19a84, type: 3}
+  - {fileID: 21300000, guid: 30d934941ae7437c05aed5354e92af3f, type: 3}
+  walkFps: 9
   idleSprite: {fileID: 21300000, guid: 164fb7696ad34f3a9910630351b6bf06, type: 3}
   attackFrames:
   - {fileID: 21300000, guid: dc1783b3a5c9607e12c781b8f88ebef7, type: 3}
