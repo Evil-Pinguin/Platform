@@ -4,8 +4,9 @@ using UnityEngine;
 // плывёт вправо и чуть проседает, поэтому воздух перестаёт быть пустым.
 // Тоже целиком из кода: тот же материал и та же нарисованная текстура.
 //
-// Как и в WindFx, модули частиц отдаются по копии — все настройки
-// кладутся обратно присваиванием вида ps.main = main.
+// Как и в WindFx: модуль частицы берём в локальную переменную и правим
+// там. Присваивать обратно нельзя — свойство только для чтения, но внутри
+// копии лежит указатель на нативный модуль, так что правки применяются.
 public class WindAmbient : MonoBehaviour
 {
     [Tooltip("Насколько широко насыпать, юниты")]
@@ -46,18 +47,15 @@ public class WindAmbient : MonoBehaviour
         main.maxParticles = Mathf.Max(1, count + 40);
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-        ps.main = main;
 
         var em = ps.emission;
         em.enabled = true;
         em.rateOverTime = count / 18f;   // держим ровно count штук в воздухе
-        ps.emission = em;
 
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale = new Vector3(area.x, area.y, 1f);
-        ps.shape = shape;
 
         // Медленно полошит по кругу, чтобы не летело строем
         var noise = ps.noise;
@@ -65,7 +63,6 @@ public class WindAmbient : MonoBehaviour
         noise.strength = new ParticleSystem.MinMaxCurve(0.12f, 0.3f);
         noise.frequency = 0.25f;
         noise.scrollSpeed = 0.2f;
-        ps.noise = noise;
 
         var col = ps.colorOverLifetime;
         col.enabled = true;
@@ -77,7 +74,6 @@ public class WindAmbient : MonoBehaviour
                     new GradientAlphaKey(tint.a, 0.75f),
                     new GradientAlphaKey(0f, 1f) });
         col.color = new ParticleSystem.MinMaxGradient(g);
-        ps.colorOverLifetime = col;
 
         var r = ps.GetComponent<ParticleSystemRenderer>();
         r.material = WindFx.SharedMaterial();

@@ -7,10 +7,14 @@ using UnityEngine;
 // Что выдаёт: порыв на рывке, след за лентой, взмах у ножа, пыль под
 // ногами при приземлении, облачко на прыжке и всплеск в точке попадания.
 //
-// Модули частиц (main, emission, shape, ...) — структуры, которые Unity
-// отдаёт ПО КОПИИ. Если взять `var m = ps.main` и написать `m.loop = true`,
-// правка пропадёт: её надо записать обратно `ps.main = m`. Все настройки
-// ниже поэтому собираются в локальную переменную и кладутся обратно.
+// Модули частиц (main, emission, shape, ...) отдаются по копии, и обратно
+// записать их нельзя: свойство только для чтения (CS0200). Но внутри такой
+// копии лежит указатель на нативный модуль, поэтому настройка поля
+// локальной переменной применяется сразу:
+//     var main = ps.main;
+//     main.loop = true;              // уже действует
+// Чего нельзя — писать в свойство напрямую (ps.emission.rateOverTime):
+// это CS1612. Все настройки ниже идут через локальную переменную.
 public class WindFx : MonoBehaviour
 {
     [Tooltip("Пыль под ногами при приземлении, частиц")]
@@ -53,7 +57,6 @@ public class WindFx : MonoBehaviour
         var shape = hit.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
         shape.radius = 0.1f;
-        hit.shape = shape;
     }
 
     void Update()
@@ -66,7 +69,6 @@ public class WindFx : MonoBehaviour
         float rate = pc != null && pc.DashActive ? 60f : 0f;
         var em = trail.emission;
         em.rateOverTime = rate;
-        trail.emission = em;
 
         if (rate > 0f && trail.time > 0.05f)
             trail.time = 0f;
@@ -111,7 +113,6 @@ public class WindFx : MonoBehaviour
         vel.space = ParticleSystemSimulationSpace.World;
         vel.x = new ParticleSystem.MinMaxCurve(dir * 2.5f, dir * 5.5f);
         vel.y = new ParticleSystem.MinMaxCurve(1.2f, 3.2f);
-        hit.velocityOverLifetime = vel;
 
         Emit(hit, hitBurst);
     }
@@ -146,25 +147,21 @@ public class WindFx : MonoBehaviour
         main.maxParticles = 220;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
-        ps.main = main;
 
         var em = ps.emission;
         em.enabled = true;
         em.rateOverTime = 0f;
-        ps.emission = em;
 
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Cone;
         shape.angle = 30f;
         shape.radius = 0.12f;
-        ps.shape = shape;
 
         // Прозракают по дуге: вспыхивают и тают
         var col = ps.colorOverLifetime;
         col.enabled = true;
         col.color = new ParticleSystem.MinMaxGradient(Fade(colour));
-        ps.colorOverLifetime = col;
 
         // Растут по ходу жизни — порыв раздувается наружу.
         // Кривую задаём двумя числами, а не AnimationCurve: такой вызов
@@ -172,7 +169,6 @@ public class WindFx : MonoBehaviour
         var grow = ps.sizeOverLifetime;
         grow.enabled = true;
         grow.size = new ParticleSystem.MinMaxCurve(0.35f, 1.3f);
-        ps.sizeOverLifetime = grow;
 
         var r = ps.GetComponent<ParticleSystemRenderer>();
         if (mat != null) r.material = mat;
