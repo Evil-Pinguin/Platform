@@ -82,6 +82,15 @@ public class PlayerController : MonoBehaviour
     public Sprite[] jumpFrames;
     [Tooltip("С какой вертикальной скорости показывается падающий кадр, юниты/с")]
     public float jumpFallSpeed = 0.1f;
+    [Header("Защита")]
+    [Tooltip("Поза прикрытия. Правая кнопка мыши")]
+    public Sprite guardSprite;
+    [Tooltip("Насколько медленно она идёт в прикрытии")]
+    public float guardMoveScale = 0.3f;
+
+    /// <summary>Правда, пока держится прикрытие. Ею пользуется Damageable:
+    /// удар в закрытую защиту не проходит.</summary>
+    public bool IsGuarding { get; private set; }
 
     [Header("Если упала с края")]
     [Tooltip("Ниже этой высоты героиня возвращается в точку старта")]
@@ -135,10 +144,15 @@ public class PlayerController : MonoBehaviour
 
         UpdateGrounded();
         ReadJumpInput();
+        ReadGuardInput();
         ReadAttackInput();
         ReadAbilityInput();
 
-        float speed = attacking ? moveSpeed * attackMoveScale : moveSpeed;
+        float speed = moveSpeed;
+        if (attacking)
+            speed *= attackMoveScale;
+        else if (IsGuarding)
+            speed *= guardMoveScale;
         float vx = body.velocity.x;
 
         float vy = body.velocity.y;
@@ -230,6 +244,14 @@ public class PlayerController : MonoBehaviour
         float g = Mathf.Abs(Physics2D.gravity.y) * body.gravityScale;
         body.velocity = new Vector2(body.velocity.x, Mathf.Sqrt(2f * g * height));
         if (fx != null) fx.Jump();
+    }
+
+    void ReadGuardInput()
+    {
+        // Правая кнопка мыши. В прикрытии можно и стоять, и идти, но только
+        // на земле: в воздухе прикрытие не держать, там кадры прыжка.
+        bool held = Input.GetMouseButton(1) || Input.GetKey(KeyCode.L);
+        IsGuarding = held && grounded && !attacking;
     }
 
     void ReadAttackInput()
@@ -418,6 +440,20 @@ public class PlayerController : MonoBehaviour
             {
                 shownFrame = f;
                 spriteRenderer.sprite = attackFrames[f];
+            }
+            spriteRenderer.flipX = face < 0f;
+            return;
+        }
+
+        // Прикрытие важнее ходьбы и покоя, но не важнее удара и прыжка:
+        // в воздухе защиту не держать, там остаются кадры прыжка.
+        if (IsGuarding && grounded && guardSprite != null)
+        {
+            animTimer = 0f;
+            if (shownFrame != -2)
+            {
+                shownFrame = -2;
+                spriteRenderer.sprite = guardSprite;
             }
             spriteRenderer.flipX = face < 0f;
             return;

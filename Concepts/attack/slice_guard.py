@@ -1,34 +1,39 @@
-"""Режет лист атаки на 3 кадра и кладёт их в Assets/Art/Heroine/Attack.
+"""Режет лист защиты на кадр и кладёт его в Assets/Art/Heroine/Guard.
 
-Альфа из заливки по границе, цвет из оригинала — тот же приём, что
-вытащил рабочий цикл ходьбы.
+От slice_walk.py отличается трем: холст шире (560, как у атаки — вытянутая
+рука с ножом в 330 не влезла бы), фигура ожидается одна вместо трёх, а
+пивот стоит не по центру холста, а в тех же 165 px, что и у кадров атаки:
+голова должна встать в ту же точку, иначе переход ходьба -> защита дёрнет
+фигуру вбок.
 
-Отличие от walk: кадры атаки крепятся НЕ по центру рамки, а по корпусу.
-В замахе нож уходит назад, в выпаде — вперёд, и при центрировании по
-рамке сама героиня ��ыла бы ездила влево-вправо при смене анимации.
-Опорная точка — центр головы (верхние 30% фигуры), он от позы не
-зависит. Та же точка считается и на кадрах ходьбы, чтобы при переходе
-с ходьбы на удар фигура не смещалась.
+Тот же приём, что в Concepts/attack/slice_attack.py: альфа снимается
+заливкой от границы по цвету фона, дыры внутри фигуры вычищаются,
+каждая фигура приводится к общей высоте (иначе в игре пульсирует
+рост), и головы всех кадров ставятся на одну и ту же точку — чтобы
+корпус не ездил влево-вправо и чтобы переход с ходьбы на удар не
+дёргался.
+
+Отличия от резальщика атаки:
+  * холст 330 px, а не 560: ходьбе широкий холст не нужен;
+  * пивот остаётся ровно посередине (165 px), как у прежних кадров,
+    поэтому кадры атаки продолжают попадать в ту же точку;
+  * кадров три, а не четыре. Модель надёжно рисует три фигуры в ряд;
+    четыре она уводит в сетку 2x2 и теряет различие поз. Три кадра при
+    9 fps дают те же 0.33 с на цикл, что и четыре при 12.
 """
 import os
 import re
 import subprocess
 import hashlib
-from statistics import median
 from collections import deque
 
-SHEET = 'Concepts/attack/attack_sheet.png'
-OUT_DIR = 'Assets/Art/Heroine/Attack'
-# Холст атаки шире ходьбы: в выпаде вытянутая рука с ножом не влезает
-# в 330 пикселей и клинок обрезался бы по краю. Пивот считается так, чтобы
-# корпус встал ровно туда же, что на кадрах ходьбы: у ходьбы пивот в
-# 165 px, то есть на (165 - 152) = 13 px правее головы. Держим эти же
-# 13 px, но уже на более широком холсте.
-WALK_CANVAS_W, WALK_PIVOT_PX = 330, 165
+SHEET = 'Concepts/attack/guard_sheet.png'
+OUT_DIR = 'Assets/Art/Heroine/Guard'
 CANVAS_W, CANVAS_H = 560, 512
-TARGET_H = 479
-FEET_Y = 504
-HEAD_FRACTION = 0.30      # какая доля высоты считается «головой»
+GUARD_PIVOT_PX = 165     # столько же, сколько у кадров атаки
+TARGET_H = 479           # общая высота фигуры в пикселях
+FEET_Y = 504             # на какой высоте стоят ступни
+HEAD_FRACTION = 0.30
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -39,9 +44,18 @@ def im_size(img):
     return int(a), int(b)
 
 
+# Фон берём с угла листа, а не задаём порогами: на этом листе он не
+# белый, а кремовый (245, 240, 216), и проверка «все каналы > 236»
+# его не узнавала — весь лист считался одной фигурой.
+BG = None
+
+
 def is_bg(px, i):
     r, g, b, a = px[i * 4:i * 4 + 4]
-    return a > 200 and r > 236 and g > 236 and b > 236
+    if a < 200:
+        return False
+    return (abs(r - BG[0]) <= 14 and abs(g - BG[1]) <= 14
+            and abs(b - BG[2]) <= 14)
 
 
 def flood_mask(px, w, h):
@@ -72,6 +86,8 @@ def flood_mask(px, w, h):
 
 
 def clear_enclosed(rgba, mask, w, h):
+    """Вычищает белые дыры, оказавшиеся внутри фигуры (между рукавом и
+    туловищем, между косой и платьем)."""
     seen = bytearray(w * h)
     q = deque()
     for x in range(w):
@@ -131,7 +147,8 @@ def components(mask, w, h, min_area):
 
 
 def head_centre(mask, w, h, box):
-    """Центр головы: середина x по верхним HEAD_FRACTION высоте фигуры."""
+    """Середина головы по верхним HEAD_FRACTION высоте фигуры: не зависит
+    от позы рук и ног, в отличие от середины всей рамки."""
     x0, y0, x1, y1 = box
     cut = y0 + max(1, int((y1 - y0) * HEAD_FRACTION))
     cols = [x for x in range(x0, x1)
@@ -146,22 +163,25 @@ def alpha_mask(path):
     return px, w, h
 
 
-# --- где держится корпус на кадрах ходьбы (чтобы не дёргаться при смене)
+# --- опорная точка: где голова на НЫНЕШНИХ кадрах ходьбы. Считаем до
+# перезаписи файлов, иначе опорой станет сам себя.
 walk_centres = []
-for i in range(1, 5):
+for i in (1, 2, 3):
     px, w, h = alpha_mask(f'Assets/Art/Heroine/Walk/walk_{i}.png')
     m = bytearray(255 if a > 40 else 0 for a in px[3::4])
     boxes = components(m, w, h, 2000)
     if boxes:
         walk_centres.append(head_centre(m, w, h, max(boxes, key=lambda b: b[1] - b[0])))
 TARGET_HEAD_X = sum(walk_centres) / len(walk_centres)
-print(f'корпус на кадрах ходьбы: {TARGET_HEAD_X:.1f}px '
+print(f'корпус на прежних кадрах ходьбы: {TARGET_HEAD_X:.1f}px '
       f'(разброс {max(walk_centres) - min(walk_centres):.1f}px)')
 
 W, H = im_size(SHEET)
-print(f'лист атаки: {W}x{H}')
+print(f'лист: {W}x{H}')
 src = subprocess.run(['convert', SHEET, '-depth', '8', 'rgba:-'],
                      capture_output=True).stdout
+globals()['BG'] = tuple(src[0:3])
+print(f'фон листа: rgb{BG}')
 mask = flood_mask(src, W, H)
 painted = bytearray(src)
 for i in range(W * H):
@@ -171,15 +191,12 @@ print(f'белых дыр вычищено: {holes}')
 
 boxes = components(mask, W, H, 2000)
 print('фигур найдено:', len(boxes))
-if len(boxes) != 3:
-    raise SystemExit('ожидалось ровно 3 фигуры')
+if len(boxes) != 1:
+    raise SystemExit('ожидалась ровно 1 фигура')
 
 heights = [b[3] - b[1] for b in boxes]
 print('высоты в листе:', heights,
       f'разброс {100 * (max(heights) - min(heights)) / min(heights):.1f}%')
-# Каждый кадр приводим к общей высоте: разброс в 6% дал бы в игре
-# пульсацию фигуры — ровно то, за что ругали ходьбу. Высота берётся по
-# рамке, поэтому у кадра, где коса разлетелась, корпус чуть сядет.
 scales = [TARGET_H / h for h in heights]
 
 for idx, (x0, y0, x1, y1) in enumerate(boxes, 1):
@@ -187,49 +204,52 @@ for idx, (x0, y0, x1, y1) in enumerate(boxes, 1):
     crop = bytearray()
     for y in range(y0, y1):
         crop += fixed[(y * W + x0) * 4:(y * W + x1) * 4]
-    tmp = f'/tmp/at_{idx}.rgba'
+    tmp = f'/tmp/wk_{idx}.rgba'
     with open(tmp, 'wb') as f:
         f.write(bytes(crop))
-    scaled = f'/tmp/at_{idx}_s.png'
+    scaled = f'/tmp/wk_{idx}_s.png'
     scale = scales[idx - 1]
     subprocess.run(['convert', '-size', f'{fw}x{fh}', '-depth', '8', f'rgba:{tmp}',
                     '-filter', 'Lanczos', '-resize',
                     f'{int(fw*scale)}x{int(fh*scale)}', scaled], check=True)
     sw, sh = im_size(scaled)
 
-    # где оказалась голова после масштабирования
+    # после масштабирования ступни должны встать на FEET_Y
+    dy = FEET_Y - sh
+    # голова после масштабирования — на ту же опорную точку
     hx = (head_centre(mask, W, H, (x0, y0, x1, y1)) - x0) * scale
     dx = round(TARGET_HEAD_X - hx)
-    pivot_px = TARGET_HEAD_X + (WALK_PIVOT_PX - TARGET_HEAD_X)
-    out = f'{OUT_DIR}/attack_{idx}.png'
-    # фигура шире холста: режем по нужному куску, а не роняем композитинг
+
+    out = f'{OUT_DIR}/guard_1.png'
     left = min(0, dx)
     width = max(CANVAS_W, dx + sw) - left
     subprocess.run(['convert', '-size', f'{width}x{CANVAS_H}', 'xc:none', scaled,
-                    '-geometry', f'{dx:+d}+0', '-composite',
+                    '-geometry', f'{dx:+d}{dy:+d}', '-composite',
                     '-crop', f'{CANVAS_W}x{CANVAS_H}+{-left}+0', '+repage', out],
                    check=True)
     os.remove(tmp)
     os.remove(scaled)
-    print(f'кадр {idx}: {fw}x{fh} -> {sw}x{sh}, сдвиг {dx:+d}px, {out}')
+    print(f'кадр {idx}: {fw}x{fh} -> {sw}x{sh}, сдвиг {dx:+d}/{dy:+d}, {out}')
 
-    # .meta как у кадров ходьбы: низ-центр, 256 пикселей на юнит
-    guid = hashlib.md5(('attack-' + str(idx)).encode()).hexdigest()
-    sid = hashlib.md5(('attack-sprite-' + str(idx)).encode()).hexdigest()
-    meta = open('Assets/Art/Heroine/Walk/walk_1.png.meta', encoding='utf-8').read()
+    guid = hashlib.md5(b'guard-v1-1').hexdigest()
+    sid = hashlib.md5(b'guard-v1-sprite-1').hexdigest()
+    meta = open('Assets/Art/Heroine/Attack/attack_1.png.meta', encoding='utf-8').read()
     meta = (meta.replace(re.search(r'guid: ([0-9a-f]{32})', meta).group(1), guid)
-                .replace(re.search(r'spriteID: ([0-9a-f]{32})', meta).group(1), sid)
-                .replace('  alignment: 7' + chr(10) + '  spritePivot: {x: 0.5, y: 0}',
-                         f'  alignment: 7' + chr(10) + f'  spritePivot: {{x: {pivot_px/CANVAS_W:.4f}, y: 0}}'))
-    # Пивот — 7 со своим значением. Прежний alignment: 1 Unity читал как
-    # TopLeft и уводил всю фигуру вниз: кадры удара оказывались по
-    # щиколотку в земле. Проверки не дадут этому вернуться.
-    assert 'alignment: 7' in meta and 'alignment: 1' not in meta, meta[:300]
-    open(f'{OUT_DIR}/attack_{idx}.png.meta', 'w', encoding='utf-8').write(meta)
+                .replace(re.search(r'spriteID: ([0-9a-f]{32})', meta).group(1), sid))
+    assert 'alignment: 7' in meta, meta[:300]
+    assert re.search(r'  spritePivot: \{x: 0\.2946, y: 0\}', meta), meta[:300]
+    assert guid not in open('Assets/Art/Heroine/Walk/walk_1.png.meta', encoding='utf-8').read()
+    open(f'{OUT_DIR}/guard_1.png.meta', 'w', encoding='utf-8').write(meta)
+    print('  guid', guid)
 
-subprocess.run(['convert'] + [f'{OUT_DIR}/attack_{i}.png' for i in range(1, 4)]
-               + ['+append', '-background', '#2b2f3a', '-bordercolor', '#2b2f3a',
-                  '-border', '6', '/tmp/attack_preview.png'], check=True)
-print('превью: /tmp/attack_preview.png')
-print(f'пивот атаки: {(TARGET_HEAD_X + (WALK_PIVOT_PX - TARGET_HEAD_X))/CANVAS_W:.4f} '
-      f'({pivot_px:.0f}px на холсте {CANVAS_W})')
+folder = hashlib.md5(b'heroine-guard-folder').hexdigest()
+open(f'{OUT_DIR}.meta', 'w', encoding='utf-8').write(
+    'fileFormatVersion: 2\n'
+    f'guid: {folder}\n'
+    'folderAsset: yes\n'
+    'DefaultImporter:\n'
+    '  externalObjects: {}\n'
+    '  userData: \n'
+    '  assetBundleName: \n'
+    '  assetBundleVariant: \n')
+print(f'пивот защиты: {165/CANVAS_W:.4f} ({GUARD_PIVOT_PX}px на холсте {CANVAS_W})')

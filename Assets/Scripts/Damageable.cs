@@ -42,6 +42,14 @@ public class Damageable : MonoBehaviour
         if (health <= 0)
             return;
 
+        // Прикрытая героиня удар не принимает. Проверка здесь, а не в
+        // контроллере, чтобы любой, кто бьёт, об этом не забывал.
+        PlayerController guard = GetComponent<PlayerController>();
+        if (guard == null)
+            guard = GetComponentInParent<PlayerController>();
+        if (guard != null && guard.IsGuarding)
+            return;
+
         health -= amount;
 
         if (rend != null)

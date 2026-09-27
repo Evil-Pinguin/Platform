@@ -26,6 +26,13 @@ AMB_GO, AMB_TR, AMB_SCRIPT = 450000001, 450000002, 450000003
 IDLE_GUID = 'c46dd459691fd1dd598775d241a19a84'
 PARALLAX_GUID = '16471e47b8e5d5aa9ad83d7b78562c9c'
 TREE_GO, TREE_TR, TREE_SCRIPT = 460000001, 460000002, 460000003
+MID_GO, MID_TR, MID_SR, MID_SCRIPT = 470000001, 470000002, 470000003, 470000004
+MIDGROUND_GUID = '2afd8a1670691ca60e7e3185170acb77'
+# Тайл 3168x330 при PPU 100 = 31.68 x 3.3 юнита. Ширина с запасом перекрывает
+# весь уровень плюс сдвиг параллакса: камера проходит ~81 юнит, слой едет
+# на 0.22 от этого, то есть на 18.
+MID_W, MID_H = 110.0, 3.3
+MID_CX, MID_Y = 5.0, -2.05
 TRAIL_GO, TRAIL_TR, TRAIL_REND = 430000001, 430000002, 430000003
 HUD_GO, HUD_TR, HUD_SCRIPT_ID = 420000001, 420000002, 420000003
 DAMAGEABLE_GUID = '08f9d654345eb7a68a9ba5703623c71b'
@@ -88,7 +95,14 @@ PLATFORMS = [
     ('Bridge_3',       24.5, 26.8, -1.0),
 ]
 
-ORDER_GROUND, ORDER_PLATFORM, ORDER_CHASM, ORDER_DECOR = 0, 1, -5, 1
+# Лестница слоёв от дальнего к ближнему. Раньше провалы стояли на -5, перед
+# деревьями, и в разрыве земли был виден дальний план вместе с провалом;
+# теперь провалы на -1, позади нашей земли, но впереди берега.
+ORDER_BG = -10
+ORDER_TREE = -4
+ORDER_MIDGROUND = -3
+ORDER_CHASM = -1
+ORDER_GROUND, ORDER_PLATFORM, ORDER_DECOR = 0, 1, 1
 
 COMMON_HEAD = """  m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -331,7 +345,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45', '46'):
+for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45', '46', '47'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -391,7 +405,18 @@ for i, (name, x, top, health) in enumerate(DUMMIES):
     blocks += dummy(250000000 + i * 10, name, x, top, health, order)
     order += 1
 
-# --- средний план: роща едет медленнее земли, но быстрее неба
+# --- средний план: берег. Лежит между рощей и нашей землёй и едет
+# медленнее земли, но быстрее деревьев: так тайга получает третью глубину.
+# По порядку: небо -10, роща -4, берег -3, провалы -1, наша земля 0,
+# декор 1, героиня 2.
+blocks.append(gameobject(MID_GO, 'MidGround', [MID_TR, MID_SR, MID_SCRIPT], 0))
+blocks.append(transform(MID_TR, MID_GO, (MID_CX, MID_Y, -0.25), 0))
+blocks.append(sprite(MID_SR, MID_GO, MIDGROUND_GUID, ORDER_MIDGROUND,
+                     (MID_W, MID_H), 2))
+blocks.append(script(MID_SCRIPT, MID_GO, PARALLAX_GUID,
+                     '  factorX: 0.78\n  factorY: 1\n'))
+
+# --- дальний план: роща едет медленнее земли, но быстрее неба
 blocks.append(gameobject(TREE_GO, 'TreeLine', [TREE_TR, TREE_SCRIPT], 0))
 blocks.append(transform(TREE_TR, TREE_GO, (0, 0, -0.5), 99))
 blocks.append(script(TREE_SCRIPT, TREE_GO, PARALLAX_GUID,
@@ -406,9 +431,9 @@ for i, (kind, x, flip, scale) in enumerate(TREES):
     top = ground_top_at(x)
     if top is None:
         top = 0.0
-    blocks.append(gameobject(gid, f'Tree_{kind}_{i:02d}', [gid + 1, gid + 2], -1))
-    blocks.append(transform(gid + 1, gid, (x, top, -0.5), -1, father=TREE_TR))
-    blocks.append(sprite(gid + 2, gid, guid, -1, (w, h), 0, flip))
+    blocks.append(gameobject(gid, f'Tree_{kind}_{i:02d}', [gid + 1, gid + 2], ORDER_TREE))
+    blocks.append(transform(gid + 1, gid, (x, top, -0.5), ORDER_TREE, father=TREE_TR))
+    blocks.append(sprite(gid + 2, gid, guid, ORDER_TREE, (w, h), 0, flip))
 
 # --- лента ветра: дочерний объект героини, тянется только на рывке
 blocks.append(gameobject(TRAIL_GO, 'DashTrail', [TRAIL_TR, TRAIL_REND], 0))
@@ -513,6 +538,8 @@ s, n = re.subn(
         '  jumpFrames:\n' + '\n'.join(
             f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in JUMP) + '\n'
         '  jumpFallSpeed: 0.1\n'
+        '  guardSprite: {fileID: 21300000, guid: 767d482e8b5eb4feae21284ed9374e28, type: 3}\n'
+        '  guardMoveScale: 0.3\n'
         '  attackFrames:\n' + '\n'.join(
             f'  - {{fileID: 21300000, guid: {g}, type: 3}}' for g in ATTACK) + '\n'
         '  attackDuration: 0.32\n  attackCooldown: 0.1\n'

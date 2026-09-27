@@ -35,6 +35,7 @@ PNG = {
     'b104a11421e6377350e663afdf1bcb1b': 'Assets/Art/Environment/tree_cluster.png',
     '33fe94647fdf3869ad5cd73fc249316d': 'Assets/Art/Environment/pillar.png',
     'c46dd459691fd1dd598775d241a19a84': 'Assets/Art/Heroine/Walk/walk_2.png',
+    '2afd8a1670691ca60e7e3185170acb77': 'Assets/Art/Environment/midground.png',
 }
 HERO = '7a2d62ffd4fe461990b64ffe293dc930'   # walk_1
 
@@ -134,7 +135,12 @@ def render(camx, camy, herox, heroy, out):
                             src], check=True)
             img = tile(src, unit, w)
             ih = int(round(h * S))
-            top = int(cy(y)) if guid in GROUND_IDS else int(cy(y + h / 2))
+            if guid in GROUND_IDS:
+                top = int(cy(y))                 # земля: верх холста = y
+            elif guid in MID_IDS:
+                top = int(cy(y + h))             # берег: низ холста = y
+            else:
+                top = int(cy(y + h / 2))
             put(img, int(cx(x) - w * S / 2), top)
         elif guid in DECOR_IDS:             # низ по центру
             src = f'/tmp/_d_{name}.png'
@@ -161,8 +167,10 @@ def render(camx, camy, herox, heroy, out):
 
 
 TILE_UNITS = {'715ee93385374f0b96aa2d97ab5033cb': 4.0,
-              'b836230688a54cfe9c6e1d59eee2e42e': 1.0}
+              'b836230688a54cfe9c6e1d59eee2e42e': 1.0,
+              '2afd8a1670691ca60e7e3185170acb77': 31.68}   # берег, тайл 3168 px / 100
 GROUND_IDS = {'715ee93385374f0b96aa2d97ab5033cb', 'b836230688a54cfe9c6e1d59eee2e42e'}
+MID_IDS = {'2afd8a1670691ca60e7e3185170acb77'}
 DECOR_IDS = {'acd1ec0f7dd66712a76a7f4aa03de836', 'b017c5b7638bea95aacc23fe69524e10',
              '5c2806664d4ba3f3f50b3741002bf34e', 'dfefd0bca0374f584c131084affd95aa'}
 
