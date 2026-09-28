@@ -217,17 +217,36 @@ public class GachaSystem : MonoBehaviour
         string n = activeCharacter;
         Sprite[] walk = LoadFrames(n, "walk");
         Sprite[] jump = LoadFrames(n, "jump");
+        if (n == PyroHeroine)
+        {
+            // Загружаем оба кадра Күн Куо явно: пустой результат не должен
+            // подменяться прыжком Лилии, иначе героиня меняет облик в воздухе.
+            Sprite risingJump = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/jump_1");
+            Sprite fallingJump = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/jump_2");
+            var kunJump = new List<Sprite>();
+            if (risingJump != null) kunJump.Add(risingJump);
+            if (fallingJump != null) kunJump.Add(fallingJump);
+            if (kunJump.Count > 0) jump = kunJump.ToArray();
+        }
         Sprite[] attack = LoadFrames(n, "attack");
         Sprite[] fall = LoadFrames(n, "fall");
         Sprite guard = Resources.Load<Sprite>("Playable/" + n + "/guard_1");
         // Если у нового персонажа пока готовы только idle и ходьба, берём
-        // недостающие боевые анимации из базового набора Лилии.
+        // недостающие боевые анимации из базового набора Лилии. Для Күн Куо
+        // это правило не касается прыжка: при пропуске ресурсов оставляем её
+        // собственную позу, но никогда не показываем кадр Лилии.
         if (defaultSkin != null)
         {
-            if (jump.Length == 0) jump = defaultSkin.jump;
+            if (jump.Length == 0 && n != PyroHeroine) jump = defaultSkin.jump;
             if (attack.Length == 0) attack = defaultSkin.attack;
             if (fall.Length == 0) fall = defaultSkin.fall;
             if (guard == null) guard = defaultSkin.guard;
+        }
+        if (n == PyroHeroine && jump.Length == 0)
+        {
+            Sprite ownIdle = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/idle_front");
+            if (ownIdle != null) jump = new[] { ownIdle };
+            Debug.LogError("Күн Куо: jump_1/jump_2 не загрузились из Resources/Playable/" + PyroHeroine + "; не подставляю прыжок Лилии.");
         }
         Sprite fly = Resources.Load<Sprite>("Playable/" + n + "/fly");
         Sprite[][] combos = LoadComboAttackSets(n);

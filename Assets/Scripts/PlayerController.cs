@@ -177,8 +177,9 @@ public class PlayerController : MonoBehaviour
         startPosition = body.position;
     }
 
-    // Смена облика героини (персонаж из гачи). Любой пустой набор кадров
-    // оставляет прежний, чтобы игра не сломалась, если какого-то кадра нет.
+    // Смена облика героини (персонаж из гачи). Отсутствующие кадры сохраняют
+    // прежний набор; явно переданный пустой набор прыжка его очищает, чтобы
+    // кадры предыдущего персонажа не просачивались в новую анимацию.
     public void ApplySkin(Sprite idle, Sprite[] walk, Sprite[] jump,
                           Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond,
                           bool flying = false, Sprite fly = null, Sprite glide = null,
@@ -197,7 +198,8 @@ public class PlayerController : MonoBehaviour
         glideSprite = glide;
         if (idle != null) idleSprite = idle;
         if (walk != null && walk.Length > 0) walkFrames = walk;
-        if (jump != null && jump.Length > 0) jumpFrames = jump;
+        // A supplied empty jump array clears stale frames from the previous skin.
+        if (jump != null) jumpFrames = jump;
         if (attack != null && attack.Length > 0) attackFrames = attack;
         if (fall != null && fall.Length > 0) fallAttackFrames = fall;
         if (guard != null) guardSprite = guard;
