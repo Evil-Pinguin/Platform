@@ -185,6 +185,25 @@ public class GachaSystem : MonoBehaviour
         return list.ToArray();
     }
 
+    static Sprite[][] LoadComboAttackSets(string name)
+    {
+        var combos = new Sprite[4][];
+        bool hasAnyFrames = false;
+        for (int attack = 1; attack <= combos.Length; attack++)
+        {
+            var frames = new List<Sprite>();
+            for (int frame = 1; frame <= 8; frame++)
+            {
+                var sprite = Resources.Load<Sprite>("Playable/" + name + "/combo_" + attack + "_" + frame);
+                if (sprite == null) break;
+                frames.Add(sprite);
+            }
+            combos[attack - 1] = frames.ToArray();
+            hasAnyFrames |= frames.Count > 0;
+        }
+        return hasAnyFrames ? combos : null;
+    }
+
     void ApplyActive()
     {
         var pc = FindObjectOfType<PlayerController>();
@@ -211,10 +230,11 @@ public class GachaSystem : MonoBehaviour
             if (guard == null) guard = defaultSkin.guard;
         }
         Sprite fly = Resources.Load<Sprite>("Playable/" + n + "/fly");
+        Sprite[][] combos = LoadComboAttackSets(n);
         pc.ApplySkin(Resources.Load<Sprite>("Playable/" + n + "/idle_front"), walk, jump,
                      attack, fall, guard, 8f,
                      // есть кадр fly — персонаж умеет летать (у Айыыны это раскрытые крылья)
-                     fly != null, fly, Resources.Load<Sprite>("Playable/" + n + "/glide"));
+                     fly != null, fly, Resources.Load<Sprite>("Playable/" + n + "/glide"), combos);
     }
 
     void SelectAsPlayer(string name)

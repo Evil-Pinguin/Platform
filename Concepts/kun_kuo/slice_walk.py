@@ -1,14 +1,16 @@
-"""Split Kun Kuo's generated 4x2 green-screen walk sheet into Unity sprites.
+"""Split Kun Kuo's generated walk and 4-hit attack sheets into Unity sprites.
 
-Requires ImageMagick's `convert`. The green matte is removed and its color spill
-is un-mixed from anti-aliased edges before the frames are written as RGBA PNGs.
+Requires ImageMagick's `convert`. Green matte pixels are removed and the
+color spill is un-mixed from anti-aliased edges before writing RGBA PNGs.
+Attack sheet columns are the four combo moves; rows are wind-up and impact.
 """
 from pathlib import Path
 import shutil
 import subprocess
 
 HERE = Path(__file__).resolve().parent
-SHEET = HERE / "walk_sheet_chroma.png"
+WALK_SHEET = HERE / "walk_sheet_chroma.png"
+ATTACK_SHEET = HERE / "attack_sheet_chroma.png"
 OUT = HERE.parent.parent / "Assets" / "Resources" / "Playable" / "Күн Куо"
 CELL_W, CELL_H = 344, 384
 CROP_W, CROP_H = 342, 382  # skip the black separators between cells
@@ -39,25 +41,33 @@ def key_green(rgba):
     return bytes(out)
 
 
+def slice_cell(sheet, col, row, target):
+    x, y = col * CELL_W + 1, row * CELL_H + 1
+    raw = subprocess.check_output([
+        "convert", str(sheet), "-crop", f"{CROP_W}x{CROP_H}+{x}+{y}",
+        "+repage", "-filter", "Lanczos", "-resize", f"{OUT_W}x{OUT_H}!",
+        "-depth", "8", "rgba:-"
+    ])
+    subprocess.run([
+        "convert", "-size", f"{OUT_W}x{OUT_H}", "-depth", "8",
+        "rgba:-", str(target)
+    ], input=key_green(raw), check=True)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
+
     for frame in range(8):
         col, row = frame % 4, frame // 4
-        x, y = col * CELL_W + 1, row * CELL_H + 1
-        raw = subprocess.check_output([
-            "convert", str(SHEET), "-crop", f"{CROP_W}x{CROP_H}+{x}+{y}",
-            "+repage", "-filter", "Lanczos", "-resize", f"{OUT_W}x{OUT_H}!",
-            "-depth", "8", "rgba:-"
-        ])
-        keyed = key_green(raw)
-        target = OUT / f"walk_{frame + 1}.png"
-        subprocess.run([
-            "convert", "-size", f"{OUT_W}x{OUT_H}", "-depth", "8",
-            "rgba:-", str(target)
-        ], input=keyed, check=True)
-
+        slice_cell(WALK_SHEET, col, row, OUT / f"walk_{frame + 1}.png")
     shutil.copyfile(OUT / "walk_2.png", OUT / "idle_front.png")
-    print(f"Wrote idle_front.png and eight walk frames to {OUT}")
+
+    for attack in range(4):
+        for stage in range(2):
+            slice_cell(ATTACK_SHEET, attack, stage,
+                       OUT / f"combo_{attack + 1}_{stage + 1}.png")
+
+    print(f"Wrote idle, eight walk frames, and four two-frame combos to {OUT}")
 
 
 if __name__ == "__main__":
