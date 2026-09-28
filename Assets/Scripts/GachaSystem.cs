@@ -433,7 +433,7 @@ public class GachaSystem : MonoBehaviour
         b.sprite = RoundedSprite();  b.type = Image.Type.Sliced;
         var rt = b.rectTransform; rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1, 0);
         rt.anchoredPosition = pos; rt.sizeDelta = new Vector2(290, 90);
-        var t = MakeText(b.transform, label + "\n💎 " + (wishCost * count) + " алмазов", 24, TextAnchor.MiddleCenter, new Color(0.3f, 0.3f, 0.35f));
+        var t = MakeText(b.transform, label + "\n◆ " + (wishCost * count) + " алмазов", 24, TextAnchor.MiddleCenter, new Color(0.3f, 0.3f, 0.35f));
         Stretch(t.rectTransform);
         var btn = b.gameObject.AddComponent<Button>(); btn.targetGraphic = b;
         btn.onClick.AddListener(() => onClick());
@@ -571,7 +571,7 @@ public class GachaSystem : MonoBehaviour
 
     void RefreshTexts()
     {
-        string p = "💎 " + primogems.ToString("N0");
+        string p = "◆ " + primogems.ToString("N0");
         primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
                         (guaranteed ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
