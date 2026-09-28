@@ -134,6 +134,7 @@ public class PlayerController : MonoBehaviour
     float face = 1f;
     float animTimer;
     int shownFrame = -1;
+    readonly RaycastHit2D[] groundHits = new RaycastHit2D[8];
     bool grounded;
     bool airJumpUsed;
     bool slamPending;
@@ -273,8 +274,21 @@ public class PlayerController : MonoBehaviour
     // Луч вниз из под центра: стоим ли мы на чём-то сейчас
     void UpdateGrounded()
     {
+        // Луч начинается внутри собственной капсулы героини, а в настройках
+        // физики включено «Queries Start In Colliders» — поэтому свой коллайдер
+        // и триггеры пропускаем, иначе героиня «стоит на земле» даже в воздухе
+        // (не было кадров прыжка/падения и не работал полёт).
         Vector2 from = (Vector2)transform.position + Vector2.up * 0.15f;
-        bool nowGrounded = Physics2D.Raycast(from, Vector2.down, 0.3f);
+        int n = Physics2D.RaycastNonAlloc(from, Vector2.down, groundHits, 0.3f);
+        bool nowGrounded = false;
+        for (int i = 0; i < n; i++)
+        {
+            Collider2D c = groundHits[i].collider;
+            if (c == null || c.isTrigger || c.attachedRigidbody == body)
+                continue;
+            nowGrounded = true;
+            break;
+        }
         if (nowGrounded && !grounded)
         {
             lastGroundedTime = Time.time;
