@@ -153,6 +153,23 @@ public class PlayerController : MonoBehaviour
         startPosition = body.position;
     }
 
+    // Смена облика героини (персонаж из гачи). Любой пустой набор кадров
+    // оставляет прежний, чтобы игра не сломалась, если какого-то кадра нет.
+    public void ApplySkin(Sprite idle, Sprite[] walk, Sprite[] jump,
+                          Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond)
+    {
+        if (idle != null) idleSprite = idle;
+        if (walk != null && walk.Length > 0) walkFrames = walk;
+        if (jump != null && jump.Length > 0) jumpFrames = jump;
+        if (attack != null && attack.Length > 0) attackFrames = attack;
+        if (fall != null && fall.Length > 0) fallAttackFrames = fall;
+        if (guard != null) guardSprite = guard;
+        if (walkFramesPerSecond > 0f) walkFps = walkFramesPerSecond;
+        shownFrame = int.MinValue;
+        if (spriteRenderer != null && idleSprite != null)
+            spriteRenderer.sprite = idleSprite;
+    }
+
     void Update()
     {
         // Открыто меню гачи/персонажей — героиня не реагирует на ввод.

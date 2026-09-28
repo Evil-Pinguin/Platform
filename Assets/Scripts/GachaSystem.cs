@@ -71,6 +71,18 @@ public class GachaSystem : MonoBehaviour
     bool animating;
     public static bool IsMenuOpen { get; private set; }
 
+    // ---------- играбельные персонажи ----------
+    // Кадры лежат в Assets/Resources/Playable/<Имя>/ :
+    // idle_front, walk_N, jump_N, attack_N, fall_N, guard_1.
+    [Header("Играбельные")]
+    [Tooltip("Основная героиня: доступна сразу, её кадры берутся из PlayerController в сцене")]
+    public string mainHeroine = "Лилия";
+    string activeCharacter;
+    const string ActiveKey = "GachaActiveCharacter";
+    class Skin { public Sprite idle, guard; public Sprite[] walk, jump, attack, fall; public float fps; }
+    Skin defaultSkin;
+    Button playButton; Text playButtonText;
+
     static readonly Color Gold = new Color(1f, 0.78f, 0.35f);
     static readonly Color Purple = new Color(0.72f, 0.5f, 1f);
     static readonly Color Blue = new Color(0.45f, 0.7f, 1f);
@@ -126,6 +138,58 @@ public class GachaSystem : MonoBehaviour
         }
         if (!characters.Exists(c => c.name == featuredCharacter && c.rarity == 5))
             featuredCharacter = characters.Find(c => c.rarity == 5).name;
+    }
+
+    void Start()
+    {
+        var pc = FindObjectOfType<PlayerController>();
+        if (pc != null)
+            defaultSkin = new Skin { idle = pc.idleSprite, guard = pc.guardSprite, walk = pc.walkFrames,
+                                     jump = pc.jumpFrames, attack = pc.attackFrames, fall = pc.fallAttackFrames, fps = pc.walkFps };
+        activeCharacter = PlayerPrefs.GetString(ActiveKey, mainHeroine);
+        if (!owned.ContainsKey(activeCharacter) || !IsPlayable(activeCharacter)) activeCharacter = mainHeroine;
+        ApplyActive();
+    }
+
+    bool IsPlayable(string name)
+    {
+        return name == mainHeroine || Resources.Load<Sprite>("Playable/" + name + "/idle_front") != null;
+    }
+
+    static Sprite[] LoadFrames(string name, string prefix)
+    {
+        var list = new List<Sprite>();
+        for (int i = 1; i <= 16; i++)
+        {
+            var sp = Resources.Load<Sprite>("Playable/" + name + "/" + prefix + "_" + i);
+            if (sp == null) break;
+            list.Add(sp);
+        }
+        return list.ToArray();
+    }
+
+    void ApplyActive()
+    {
+        var pc = FindObjectOfType<PlayerController>();
+        if (pc == null) return;
+        if (activeCharacter == mainHeroine || !IsPlayable(activeCharacter))
+        {
+            if (defaultSkin != null)
+                pc.ApplySkin(defaultSkin.idle, defaultSkin.walk, defaultSkin.jump, defaultSkin.attack, defaultSkin.fall, defaultSkin.guard, defaultSkin.fps);
+            return;
+        }
+        string n = activeCharacter;
+        pc.ApplySkin(Resources.Load<Sprite>("Playable/" + n + "/idle_front"), LoadFrames(n, "walk"), LoadFrames(n, "jump"),
+                     LoadFrames(n, "attack"), LoadFrames(n, "fall"), Resources.Load<Sprite>("Playable/" + n + "/guard_1"), 8f);
+    }
+
+    void SelectAsPlayer(string name)
+    {
+        activeCharacter = name;
+        PlayerPrefs.SetString(ActiveKey, name);
+        PlayerPrefs.Save();
+        ApplyActive();
+        RefreshCharacterInfo();
     }
 
     void FillDefaultRoster()
@@ -507,6 +571,21 @@ public class GachaSystem : MonoBehaviour
             constNodes[i] = n;
         }
 
+        // Кнопка «Играть» — как «Сменить» в меню персонажа Genshin
+        var pb = MakePanel(info.transform, "PlayButton", Gold);
+        pb.sprite = RoundedSprite(); pb.type = Image.Type.Sliced;
+        var pbr = pb.rectTransform; pbr.anchorMin = pbr.anchorMax = pbr.pivot = new Vector2(1, 0);
+        pbr.anchoredPosition = new Vector2(-30, 30); pbr.sizeDelta = new Vector2(240, 70);
+        playButtonText = MakeText(pb.transform, "Играть", 28, TextAnchor.MiddleCenter, new Color(0.25f, 0.2f, 0.1f));
+        Stretch(playButtonText.rectTransform);
+        playButton = pb.gameObject.AddComponent<Button>(); playButton.targetGraphic = pb;
+        playButton.onClick.AddListener(() =>
+        {
+            var l = OwnedSorted();
+            if (selectedChar >= 0 && selectedChar < l.Count && IsPlayable(l[selectedChar].name))
+                SelectAsPlayer(l[selectedChar].name);
+        });
+
         charPanel.SetActive(false);
     }
 
@@ -607,6 +686,7 @@ public class GachaSystem : MonoBehaviour
         bool has = selectedChar >= 0 && selectedChar < list.Count;
         foreach (var n in constNodes) n.gameObject.SetActive(has && charTab == "Созвездия");
         infoConst.gameObject.SetActive(has && charTab == "Созвездия");
+        if (playButton != null) playButton.gameObject.SetActive(false);
         if (!has)
         {
             infoName.text = "Пока пусто"; infoElement.text = ""; infoStars.text = "";
@@ -617,6 +697,13 @@ public class GachaSystem : MonoBehaviour
         var c = list[selectedChar];
         int copies = owned[c.name]; int cons = Mathf.Min(copies - 1, 6);
         infoName.text = c.name;
+        if (playButton != null)
+        {
+            playButton.gameObject.SetActive(true);
+            bool playable = IsPlayable(c.name), active = c.name == activeCharacter;
+            playButton.interactable = playable && !active;
+            playButtonText.text = active ? "✓ В игре" : playable ? "Играть" : "Скоро";
+        }
         infoElement.text = "◆ " + c.element; infoElement.color = ElementColor(c.element);
         infoStars.text = Stars(c.rarity); infoStars.color = RarityColor(c);
         if (charTab == "Атрибуты")
@@ -659,12 +746,14 @@ public class GachaSystem : MonoBehaviour
     void Load()
     {
         owned.Clear();
+        owned[mainHeroine] = 1; // основная героиня есть всегда, как Путешественник в Genshin
         if (!PlayerPrefs.HasKey(SaveKey)) { primogems = startPrimogems; return; }
         var d = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
         primogems = d.primogems; pity5 = d.pity5; pity4 = d.pity4; totalWishes = d.totalWishes; guaranteed = d.guaranteed;
         // старое сохранение (до алмазов) — выдаём стартовый запас
         if (d.version < 2) { primogems += startPrimogems; Save(); }
         for (int i = 0; i < d.names.Count && i < d.counts.Count; i++) owned[d.names[i]] = d.counts[i];
+        if (!owned.ContainsKey(mainHeroine)) owned[mainHeroine] = 1;
     }
 
     [ContextMenu("Сбросить сохранение гачи")]
