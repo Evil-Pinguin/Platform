@@ -184,7 +184,8 @@ public class GachaSystem : MonoBehaviour
         pc.ApplySkin(Resources.Load<Sprite>("Playable/" + n + "/idle_front"), LoadFrames(n, "walk"), LoadFrames(n, "jump"),
                      LoadFrames(n, "attack"), LoadFrames(n, "fall"), Resources.Load<Sprite>("Playable/" + n + "/guard_1"), 8f,
                      // есть кадр fly — персонаж умеет летать (у Айыыны это раскрытые крылья)
-                     Resources.Load<Sprite>("Playable/" + n + "/fly") != null, Resources.Load<Sprite>("Playable/" + n + "/fly"));
+                     Resources.Load<Sprite>("Playable/" + n + "/fly") != null, Resources.Load<Sprite>("Playable/" + n + "/fly"),
+                     Resources.Load<Sprite>("Playable/" + n + "/glide"));
     }
 
     void SelectAsPlayer(string name)

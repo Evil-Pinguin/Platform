@@ -98,6 +98,8 @@ public class PlayerController : MonoBehaviour
     public float glideFallSpeed = 1.2f;
     [Tooltip("Кадр с раскрытыми крыльями (если пусто — второй кадр прыжка)")]
     public Sprite flySprite;
+    [Tooltip("Кадр падения/планирования: крылья раскрыты во всю ширину (если пусто — кадр полёта)")]
+    public Sprite glideSprite;
     public bool IsFlying { get; private set; }
     float flyRiseLeft;
 
@@ -171,10 +173,11 @@ public class PlayerController : MonoBehaviour
     // оставляет прежний, чтобы игра не сломалась, если какого-то кадра нет.
     public void ApplySkin(Sprite idle, Sprite[] walk, Sprite[] jump,
                           Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond,
-                          bool flying = false, Sprite fly = null)
+                          bool flying = false, Sprite fly = null, Sprite glide = null)
     {
         canFly = flying;
         flySprite = fly;
+        glideSprite = glide;
         if (idle != null) idleSprite = idle;
         if (walk != null && walk.Length > 0) walkFrames = walk;
         if (jump != null && jump.Length > 0) jumpFrames = jump;
@@ -580,11 +583,14 @@ public class PlayerController : MonoBehaviour
         // Крылатая героиня: в полёте и при любом падении крылья раскрыты
         if (IsFlying || (canFly && !grounded && body.velocity.y <= jumpFallSpeed))
         {
-            Sprite wings = flySprite != null ? flySprite
+            bool falling = body.velocity.y <= jumpFallSpeed;
+            Sprite wings = falling && glideSprite != null ? glideSprite
+                         : flySprite != null ? flySprite
                          : (jumpFrames != null && jumpFrames.Length > 0 ? jumpFrames[jumpFrames.Length - 1] : null);
-            if (wings != null && shownFrame != -3)
+            int id = wings == glideSprite ? -4 : -3;
+            if (wings != null && shownFrame != id)
             {
-                shownFrame = -3;
+                shownFrame = id;
                 spriteRenderer.sprite = wings;
             }
             spriteRenderer.flipX = face < 0f;

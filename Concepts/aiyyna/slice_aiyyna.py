@@ -114,3 +114,25 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+def glide():
+    """Отдельный кадр планирования: крылья раскрыты во всю ширину."""
+    rgba = load_rgba(os.path.join(HERE, 'glide_sheet.png'))
+    m = rgba[..., 3] > 128
+    lab, n = ndimage.label(m)
+    sizes = ndimage.sum(m, lab, range(1, n + 1))
+    keep = [i + 1 for i, v in enumerate(sizes) if v > sizes.max() * 0.02]
+    rgba[..., 3] = np.where(np.isin(lab, keep), rgba[..., 3], 0)
+    ys, xs = np.where(rgba[..., 3] > 128)
+    crop = rgba[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    # рост фигуры (макушка ~190 px, ступни ~725 px листа) приводим к росту героини
+    s = TARGET_H / 560.0
+    img = Image.fromarray(crop)
+    img = img.resize((int(img.width * s), int(img.height * s)), Image.LANCZOS)
+    body_x = (620 - xs.min()) * s          # центр корпуса на листе ~ x=620
+    half = int(max(body_x, img.width - body_x)) + 4
+    canvas = Image.new('RGBA', (2 * half, max(CANVAS_H, img.height + 8)), (0, 0, 0, 0))
+    canvas.paste(img, (int(half - body_x), canvas.height - (CANVAS_H - FEET_Y) - img.height), img)
+    canvas.save(os.path.join(OUT, 'glide.png'))
+    print('glide', canvas.size)
