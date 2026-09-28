@@ -30,7 +30,8 @@ public class GachaSystem : MonoBehaviour
     public List<CharacterData> characters = new List<CharacterData>();
 
     [Header("Экономика")]
-    public int startPrimogems = 16000;
+    [Tooltip("Сколько алмазов даётся на старте")]
+    public int startPrimogems = 1000000;
     public int wishCost = 160;
 
     [Header("Шансы (как в Genshin)")]
@@ -51,7 +52,7 @@ public class GachaSystem : MonoBehaviour
 
     [Serializable] class SaveData
     {
-        public int primogems, pity5, pity4, totalWishes; public bool guaranteed;
+        public int primogems, pity5, pity4, totalWishes, version; public bool guaranteed;
         public List<string> names = new List<string>(); public List<int> counts = new List<int>();
     }
 
@@ -432,7 +433,7 @@ public class GachaSystem : MonoBehaviour
         b.sprite = RoundedSprite();  b.type = Image.Type.Sliced;
         var rt = b.rectTransform; rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1, 0);
         rt.anchoredPosition = pos; rt.sizeDelta = new Vector2(290, 90);
-        var t = MakeText(b.transform, label + "\n✦ " + (wishCost * count), 24, TextAnchor.MiddleCenter, new Color(0.3f, 0.3f, 0.35f));
+        var t = MakeText(b.transform, label + "\n💎 " + (wishCost * count) + " алмазов", 24, TextAnchor.MiddleCenter, new Color(0.3f, 0.3f, 0.35f));
         Stretch(t.rectTransform);
         var btn = b.gameObject.AddComponent<Button>(); btn.targetGraphic = b;
         btn.onClick.AddListener(() => onClick());
@@ -570,8 +571,8 @@ public class GachaSystem : MonoBehaviour
 
     void RefreshTexts()
     {
-        string p = "✦ " + primogems;
-        primoHudText.text = p; primoWishText.text = "Камни истока: " + p;
+        string p = "💎 " + primogems.ToString("N0");
+        primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
                         (guaranteed ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
     }
@@ -649,7 +650,7 @@ public class GachaSystem : MonoBehaviour
 
     void Save()
     {
-        var d = new SaveData { primogems = primogems, pity5 = pity5, pity4 = pity4, totalWishes = totalWishes, guaranteed = guaranteed };
+        var d = new SaveData { primogems = primogems, pity5 = pity5, pity4 = pity4, totalWishes = totalWishes, guaranteed = guaranteed, version = 2 };
         foreach (var kv in owned) { d.names.Add(kv.Key); d.counts.Add(kv.Value); }
         PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(d));
         PlayerPrefs.Save();
@@ -661,6 +662,8 @@ public class GachaSystem : MonoBehaviour
         if (!PlayerPrefs.HasKey(SaveKey)) { primogems = startPrimogems; return; }
         var d = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
         primogems = d.primogems; pity5 = d.pity5; pity4 = d.pity4; totalWishes = d.totalWishes; guaranteed = d.guaranteed;
+        // старое сохранение (до алмазов) — выдаём стартовый запас
+        if (d.version < 2) { primogems += startPrimogems; Save(); }
         for (int i = 0; i < d.names.Count && i < d.counts.Count; i++) owned[d.names[i]] = d.counts[i];
     }
 
@@ -671,8 +674,8 @@ public class GachaSystem : MonoBehaviour
         Load(); RefreshTexts();
     }
 
-    [ContextMenu("Добавить 16000 камней")]
-    public void AddPrimogems() { primogems += 16000; Save(); RefreshTexts(); }
+    [ContextMenu("Добавить 1 000 000 алмазов")]
+    public void AddPrimogems() { primogems += 1000000; Save(); RefreshTexts(); }
 
     // =================== ХЕЛПЕРЫ UI ===================
 
