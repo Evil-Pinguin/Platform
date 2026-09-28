@@ -95,8 +95,18 @@ public class HeroHealth : MonoBehaviour
         var sr = GetComponent<SpriteRenderer>();
         if (sr == null) yield break;
         Color baseColor = sr.color;
-        sr.color = new Color(1f, 0.4f, 0.35f, baseColor.a);
-        yield return new WaitForSeconds(0.15f);
+        // При получении урона — яркое покраснение с миганием (как в Genshin)
+        Color red = new Color(1f, 0.12f, 0.08f, baseColor.a);
+        for (int i = 0; i < 3; i++)
+        {
+            sr.color = red;
+            yield return new WaitForSeconds(0.09f);
+            if (i < 2)
+            {
+                sr.color = baseColor;
+                yield return new WaitForSeconds(0.06f);
+            }
+        }
         if (sr != null) sr.color = baseColor;
         flashing = null;
     }
