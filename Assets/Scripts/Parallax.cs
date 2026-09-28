@@ -13,6 +13,12 @@ public class Parallax : MonoBehaviour
 
     Transform cam;
     Vector3 camOrigin;
+    Vector3 startPos;   // где слой стоит в сцене — от этой точки и считаем сдвиг
+
+    void Awake()
+    {
+        startPos = transform.position;
+    }
 
     void Start()
     {
@@ -36,8 +42,10 @@ public class Parallax : MonoBehaviour
         // Камера уехала на d — сдвигаем слой на долю от d. Остальное
         // смещение как раз и даёт медленное движение.
         Vector3 d = cam.position - camOrigin;
-        transform.position = new Vector3(d.x * (1f - factorX),
-                                         d.y * (1f - factorY),
-                                         0f);
+        // Раньше позиция ставилась с нуля, и слой, стоявший на y = -6.97,
+        // при запуске подпрыгивал к y = 0 и висел в воздухе.
+        transform.position = new Vector3(startPos.x + d.x * (1f - factorX),
+                                         startPos.y + d.y * (1f - factorY),
+                                         startPos.z);
     }
 }
