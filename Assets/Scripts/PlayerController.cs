@@ -87,6 +87,20 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Высота двойного прыжка, юниты")]
     public float doubleJumpHeight = 1.5f;
 
+    [Header("Полёт на крыльях (у персонажей с крыльями, напр. Айыына)")]
+    [Tooltip("Включается автоматически, когда выбран крылатый персонаж")]
+    public bool canFly = false;
+    [Tooltip("Скорость взлёта, пока зажат пробел")]
+    public float flyUpSpeed = 7f;
+    [Tooltip("Сколько секунд можно набирать высоту за один полёт")]
+    public float flyRiseTime = 1.1f;
+    [Tooltip("Скорость медленного падения с раскрытыми крыльями")]
+    public float glideFallSpeed = 1.2f;
+    [Tooltip("Кадр с раскрытыми крыльями (если пусто — второй кадр прыжка)")]
+    public Sprite flySprite;
+    public bool IsFlying { get; private set; }
+    float flyRiseLeft;
+
     [Header("Анимация")]
     [Tooltip("Кадры ходьбы по порядку (нарисованы лицом вправо)")]
     public Sprite[] walkFrames;
@@ -156,8 +170,11 @@ public class PlayerController : MonoBehaviour
     // Смена облика героини (персонаж из гачи). Любой пустой набор кадров
     // оставляет прежний, чтобы игра не сломалась, если какого-то кадра нет.
     public void ApplySkin(Sprite idle, Sprite[] walk, Sprite[] jump,
-                          Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond)
+                          Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond,
+                          bool flying = false, Sprite fly = null)
     {
+        canFly = flying;
+        flySprite = fly;
         if (idle != null) idleSprite = idle;
         if (walk != null && walk.Length > 0) walkFrames = walk;
         if (jump != null && jump.Length > 0) jumpFrames = jump;
@@ -207,6 +224,24 @@ public class PlayerController : MonoBehaviour
         {
             vx = Mathf.MoveTowards(vx, move * speed, acceleration * Time.deltaTime);
         }
+
+        // Полёт: зажат пробел в воздухе — сначала взлёт, потом плавное планирование
+        IsFlying = false;
+        if (canFly && !grounded && dashTimer <= 0f && FlyHeld())
+        {
+            IsFlying = true;
+            if (flyRiseLeft > 0f)
+            {
+                flyRiseLeft -= Time.deltaTime;
+                vy = Mathf.Max(vy, flyUpSpeed);
+            }
+            else if (vy < -glideFallSpeed)
+            {
+                vy = -glideFallSpeed;
+            }
+        }
+        if (grounded)
+            flyRiseLeft = flyRiseTime;   // на земле запас взлёта восстанавливается
 
         body.velocity = new Vector2(vx, vy);
 
@@ -270,11 +305,16 @@ public class PlayerController : MonoBehaviour
         }
 
         // Отпустили кнопку в начале подъёма — срезаем высоту
-        if (!held && Time.time - jumpStartedAt < jumpHoldTime && body.velocity.y > 0f)
+        if (!held && !IsFlying && Time.time - jumpStartedAt < jumpHoldTime && body.velocity.y > 0f)
         {
             body.velocity = new Vector2(body.velocity.x, body.velocity.y * 0.45f);
             jumpStartedAt = -99f;
         }
+    }
+
+    static bool FlyHeld()
+    {
+        return Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow);
     }
 
     void Launch(float height)
@@ -537,6 +577,19 @@ public class PlayerController : MonoBehaviour
         // В воздухе — кадры прыжка: взлёт, пока ещё летит вверх, и падение,
         // как только начала опускаться. Кадры взяты в полный рост, поэтому
         // переход ходьба -> прыжок не меняет размер фигуры.
+        if (IsFlying)
+        {
+            Sprite wings = flySprite != null ? flySprite
+                         : (jumpFrames != null && jumpFrames.Length > 0 ? jumpFrames[jumpFrames.Length - 1] : null);
+            if (wings != null && shownFrame != -3)
+            {
+                shownFrame = -3;
+                spriteRenderer.sprite = wings;
+            }
+            spriteRenderer.flipX = face < 0f;
+            return;
+        }
+
         if (!grounded && jumpFrames != null && jumpFrames.Length > 0)
         {
             int frame = body.velocity.y > jumpFallSpeed ? 0 : jumpFrames.Length - 1;
