@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
 def glide():
     """Отдельный кадр планирования: крылья раскрыты во всю ширину."""
-    rgba = load_rgba(os.path.join(HERE, 'glide_sheet.png'))
+    rgba = shrink_wings()
     m = rgba[..., 3] > 128
     lab, n = ndimage.label(m)
     sizes = ndimage.sum(m, lab, range(1, n + 1))
@@ -136,3 +136,45 @@ def glide():
     canvas.paste(img, (int(half - body_x), canvas.height - (CANVAS_H - FEET_Y) - img.height), img)
     canvas.save(os.path.join(OUT, 'glide.png'))
     print('glide', canvas.size)
+
+
+def shrink_wings(k=0.72):
+    """Уменьшает крылья на листе планирования: всё, что вне контура фигуры
+    (голова, волосы, тело, ноги, копьё), считается крылом и сжимается к
+    основанию крыла у спины. Фигура кладётся сверху без изменений."""
+    from PIL import ImageDraw
+    src = Image.fromarray(load_rgba(os.path.join(HERE, 'glide_sheet.png')))
+    W, H = src.size
+    body_poly = [(660, 175), (720, 168), (790, 228), (800, 330), (790, 420), (820, 468),
+                 (1080, 668), (1045, 672), (800, 500), (700, 520), (680, 705), (640, 712),
+                 (500, 732), (455, 700), (415, 660), (365, 525), (470, 440), (430, 385),
+                 (430, 300), (560, 238), (640, 215)]
+    pm = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(pm).polygon(body_poly, fill=255)
+    pm_a = np.asarray(pm) > 0
+    s = np.asarray(src)
+    xs = np.arange(W)[None, :].repeat(H, 0)
+    body = s.copy(); body[..., 3] = np.where(pm_a, s[..., 3], 0)
+    out = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    # крыло = крупная связная область вне контура фигуры; сторона — по центру
+    # области. Мелкие обрывки (края платья, копья) остаются на месте, в фигуре.
+    outside = (~pm_a) & (s[..., 3] > 20)
+    lab, n = ndimage.label(outside)
+    sizes = ndimage.sum(outside, lab, range(1, n + 1))
+    left_ids, right_ids, keep_ids = [], [], []
+    for i, v in enumerate(sizes, 1):
+        if v < sizes.max() * 0.05:
+            keep_ids.append(i)
+        elif ndimage.center_of_mass(outside, lab, i)[1] < 620:
+            left_ids.append(i)
+        else:
+            right_ids.append(i)
+    body[..., 3] = np.where(pm_a | np.isin(lab, keep_ids), s[..., 3], 0)
+    for side, root in ((np.isin(lab, left_ids), (560, 250)), (np.isin(lab, right_ids), (800, 250))):
+        layer = s.copy(); layer[..., 3] = np.where(side, s[..., 3], 0)
+        rx, ry = root
+        # обратное отображение: точка вывода p -> источник R + (p - R) / k
+        m = (1 / k, 0, rx - rx / k, 0, 1 / k, ry - ry / k)
+        out.alpha_composite(Image.fromarray(layer).transform((W, H), Image.AFFINE, m, Image.BICUBIC))
+    out.alpha_composite(Image.fromarray(body))
+    return np.asarray(out).copy()
