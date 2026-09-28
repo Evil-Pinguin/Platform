@@ -27,6 +27,8 @@ public class GachaSystem : MonoBehaviour
     [Header("Персонажи")]
     [Tooltip("Персонаж баннера (5★, шанс 50/50, затем гарантия)")]
     public string featuredCharacter = "Лилия";
+    [Tooltip("Включено: все 5★ персонажи выпадают с равным шансом (без 50/50). Выключено: ивент-баннер одного персонажа.")]
+    public bool allCharactersEqual = true;
     public List<CharacterData> characters = new List<CharacterData>();
 
     [Header("Экономика")]
@@ -230,6 +232,11 @@ public class GachaSystem : MonoBehaviour
         if (r < chance5)
         {
             pity5 = 0; pity4 = 0;
+            if (allCharactersEqual)
+            {
+                var all5 = characters.FindAll(c => c.rarity == 5);
+                if (all5.Count > 0) return all5[UnityEngine.Random.Range(0, all5.Count)];
+            }
             CharacterData featured = characters.Find(c => c.name == featuredCharacter && c.rarity == 5);
             bool win = guaranteed || UnityEngine.Random.value < 0.5f;
             if (featured != null && win) { guaranteed = false; return featured; }
@@ -466,20 +473,42 @@ public class GachaSystem : MonoBehaviour
         stripe.rectTransform.offsetMin = stripe.rectTransform.offsetMax = Vector2.zero;
 
         var feat = characters.Find(c => c.name == featuredCharacter);
-        var bt = MakeText(banner.transform, "Цветение алой лилии", 46, TextAnchor.UpperLeft, Color.white);
+        var bt = MakeText(banner.transform, allCharactersEqual ? "Зов небес Олонхо" : "Цветение алой лилии", 46, TextAnchor.UpperLeft, Color.white);
         TopLeft(bt.rectTransform, new Vector2(40, -40), new Vector2(520, 130));
         bt.gameObject.AddComponent<Shadow>();
-        var bd = MakeText(banner.transform,
+        var bd = MakeText(banner.transform, allCharactersEqual ?
+            "Все легендарные персонажи выпадают\nс одинаковым шансом!\n\n" +
+            "• Каждые 10 молитв — гарантированно 4★ или выше\n• Не более 90 молитв до 5★\n• Повторный персонаж открывает созвездие" :
             "Вероятность выпадения 5★ персонажа\n«" + featuredCharacter + "» значительно увеличена!\n\n" +
             "• Каждые 10 молитв — гарантированно 4★ или выше\n• Не более 90 молитв до 5★\n• Проиграли 50/50 — следующий 5★ гарантированно персонаж баннера",
             20, TextAnchor.UpperLeft, Color.white);
         TopLeft(bd.rectTransform, new Vector2(40, -180), new Vector2(480, 300));
 
+        if (allCharactersEqual)
+        {
+            // все 5★ в ряд на правой части баннера
+            var five = characters.FindAll(c => c.rarity == 5);
+            float areaW = 740f, x0 = 650f - areaW / 2f - 20f;
+            float w = five.Count > 0 ? areaW / five.Count : areaW;
+            for (int i = 0; i < five.Count; i++)
+            {
+                var a = MakeCharacterArt(banner.transform, five[i], new Vector2(w - 8, 560));
+                a.anchoredPosition = new Vector2(x0 + w * (i + 0.5f), 20);
+                a.GetComponent<Image>().preserveAspect = five[i].portrait != null;
+                var nm = MakeText(banner.transform, five[i].name, 22, TextAnchor.MiddleCenter, Gold);
+                nm.rectTransform.anchoredPosition = new Vector2(x0 + w * (i + 0.5f), -290);
+                nm.rectTransform.sizeDelta = new Vector2(w, 34);
+                nm.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.7f);
+            }
+        }
+        else
+        {
         var art = MakeCharacterArt(banner.transform, feat, new Vector2(460, 600));
         art.anchoredPosition = new Vector2(280, 0);
         var fn = MakeText(banner.transform, featuredCharacter + "\n" + Stars(5), 36, TextAnchor.LowerRight, Gold);
         fn.rectTransform.anchoredPosition = new Vector2(460, -230); fn.rectTransform.sizeDelta = new Vector2(300, 110);
         fn.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.6f);
+        }
 
         pityText = MakeText(bg.transform, "", 20, TextAnchor.MiddleLeft, new Color(0.8f, 0.8f, 0.85f));
         var pt = pityText.rectTransform; pt.anchorMin = pt.anchorMax = pt.pivot = new Vector2(0, 0);
@@ -653,7 +682,7 @@ public class GachaSystem : MonoBehaviour
         string p = "◆ " + primogems.ToString("N0");
         primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
-                        (guaranteed ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
+                        (guaranteed && !allCharactersEqual ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
     }
 
     void RebuildCharacterList()
