@@ -102,13 +102,23 @@ public class GachaSystem : MonoBehaviour
         var elements = (Element[])Enum.GetValues(typeof(Element));
         foreach (var tex in textures)
         {
-            if (characters.Exists(c => c.name == tex.name)) continue;
+            // Имя файла вида «Имя (Элемент).png» — элемент берётся из скобок.
+            string charName = tex.name;
+            Element element = elements[Mathf.Abs(tex.name.GetHashCode()) % elements.Length];
+            int br = tex.name.IndexOf('(');
+            if (br > 0 && tex.name.EndsWith(")"))
+            {
+                charName = tex.name.Substring(0, br).Trim();
+                string el = tex.name.Substring(br + 1, tex.name.Length - br - 2).Trim();
+                foreach (var e in elements) if (e.ToString() == el) element = e;
+            }
+            if (characters.Exists(c => c.name == charName)) continue;
             var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100);
             characters.Add(new CharacterData
             {
-                name = tex.name,
+                name = charName,
                 rarity = 5,
-                element = elements[Mathf.Abs(tex.name.GetHashCode()) % elements.Length],
+                element = element,
                 portrait = sprite,
                 description = "Легендарный персонаж."
             });
