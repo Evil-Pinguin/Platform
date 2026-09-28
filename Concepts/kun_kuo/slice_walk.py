@@ -4,6 +4,7 @@ Requires ImageMagick's `convert`. Green matte pixels are removed and the
 color spill is un-mixed from anti-aliased edges before writing RGBA PNGs.
 Attack sheet columns are the four combo moves; rows are wind-up and impact.
 The jump sheet reuses its first and third top-row cells for ascent and descent.
+The fall-attack sheet is a two-column horizontal strip: wind-up, then plunge.
 """
 from pathlib import Path
 import shutil
@@ -12,6 +13,7 @@ import subprocess
 HERE = Path(__file__).resolve().parent
 WALK_SHEET = HERE / "walk_sheet_chroma.png"
 JUMP_SHEET = HERE / "jump_sheet_chroma.png"
+FALL_SHEET = HERE / "fall_sheet_chroma.png"
 ATTACK_SHEET = HERE / "attack_sheet_chroma.png"
 OUT = HERE.parent.parent / "Assets" / "Resources" / "Playable" / "Күн Куо"
 CELL_W, CELL_H = 344, 384
@@ -43,10 +45,11 @@ def key_green(rgba):
     return bytes(out)
 
 
-def slice_cell(sheet, col, row, target):
-    x, y = col * CELL_W + 1, row * CELL_H + 1
+def slice_cell(sheet, col, row, target, cell_w=CELL_W, cell_h=CELL_H,
+               crop_w=CROP_W, crop_h=CROP_H, offset_x=1, offset_y=1):
+    x, y = col * cell_w + offset_x, row * cell_h + offset_y
     raw = subprocess.check_output([
-        "convert", str(sheet), "-crop", f"{CROP_W}x{CROP_H}+{x}+{y}",
+        "convert", str(sheet), "-crop", f"{crop_w}x{crop_h}+{x}+{y}",
         "+repage", "-filter", "Lanczos", "-resize", f"{OUT_W}x{OUT_H}!",
         "-depth", "8", "rgba:-"
     ])
@@ -69,12 +72,17 @@ def main():
     for frame, col in enumerate((0, 2), start=1):
         slice_cell(JUMP_SHEET, col, 0, OUT / f"jump_{frame}.png")
 
+    for frame in range(2):
+        slice_cell(FALL_SHEET, frame, 0, OUT / f"fall_{frame + 1}.png",
+                   cell_w=728, cell_h=720, crop_w=690, crop_h=718,
+                   offset_x=19)
+
     for attack in range(4):
         for stage in range(2):
             slice_cell(ATTACK_SHEET, attack, stage,
                        OUT / f"combo_{attack + 1}_{stage + 1}.png")
 
-    print(f"Wrote idle, eight walk frames, two jump frames, and four two-frame combos to {OUT}")
+    print(f"Wrote idle, eight walk frames, two jump frames, two fall attacks, and four two-frame combos to {OUT}")
 
 
 if __name__ == "__main__":

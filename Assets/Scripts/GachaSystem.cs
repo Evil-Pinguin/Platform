@@ -230,16 +230,23 @@ public class GachaSystem : MonoBehaviour
         }
         Sprite[] attack = LoadFrames(n, "attack");
         Sprite[] fall = LoadFrames(n, "fall");
+        if (n == PyroHeroine)
+        {
+            Sprite fallStart = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/fall_1");
+            Sprite fallStrike = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/fall_2");
+            var kunFall = new List<Sprite>();
+            if (fallStart != null) kunFall.Add(fallStart);
+            if (fallStrike != null) kunFall.Add(fallStrike);
+            if (kunFall.Count > 0) fall = kunFall.ToArray();
+        }
         Sprite guard = Resources.Load<Sprite>("Playable/" + n + "/guard_1");
-        // Если у нового персонажа пока готовы только idle и ходьба, берём
-        // недостающие боевые анимации из базового набора Лилии. Для Күн Куо
-        // это правило не касается прыжка: при пропуске ресурсов оставляем её
-        // собственную позу, но никогда не показываем кадр Лилии.
+        // Missing animations may use the base set for other characters, but
+        // never let Lilia's jump or falling attack leak into Kun Kuo's skin.
         if (defaultSkin != null)
         {
             if (jump.Length == 0 && n != PyroHeroine) jump = defaultSkin.jump;
             if (attack.Length == 0) attack = defaultSkin.attack;
-            if (fall.Length == 0) fall = defaultSkin.fall;
+            if (fall.Length == 0 && n != PyroHeroine) fall = defaultSkin.fall;
             if (guard == null) guard = defaultSkin.guard;
         }
         if (n == PyroHeroine && jump.Length == 0)
@@ -247,6 +254,11 @@ public class GachaSystem : MonoBehaviour
             Sprite ownIdle = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/idle_front");
             if (ownIdle != null) jump = new[] { ownIdle };
             Debug.LogError("Күн Куо: jump_1/jump_2 не загрузились из Resources/Playable/" + PyroHeroine + "; не подставляю прыжок Лилии.");
+        }
+        if (n == PyroHeroine && fall.Length == 0)
+        {
+            fall = jump;
+            Debug.LogError("Күн Куо: fall_1/fall_2 не загрузились из Resources/Playable/" + PyroHeroine + "; не подставляю атаку Лилии.");
         }
         Sprite fly = Resources.Load<Sprite>("Playable/" + n + "/fly");
         Sprite[][] combos = LoadComboAttackSets(n);
