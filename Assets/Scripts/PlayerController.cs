@@ -577,7 +577,8 @@ public class PlayerController : MonoBehaviour
         // В воздухе — кадры прыжка: взлёт, пока ещё летит вверх, и падение,
         // как только начала опускаться. Кадры взяты в полный рост, поэтому
         // переход ходьба -> прыжок не меняет размер фигуры.
-        if (IsFlying)
+        // Крылатая героиня: в полёте и при любом падении крылья раскрыты
+        if (IsFlying || (canFly && !grounded && body.velocity.y <= jumpFallSpeed))
         {
             Sprite wings = flySprite != null ? flySprite
                          : (jumpFrames != null && jumpFrames.Length > 0 ? jumpFrames[jumpFrames.Length - 1] : null);
