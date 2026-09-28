@@ -155,6 +155,10 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // Открыто меню гачи/персонажей — героиня не реагирует на ввод.
+        if (GachaSystem.IsMenuOpen)
+            return;
+
         float move = Input.GetAxisRaw("Horizontal");
         if (Mathf.Abs(move) > 0.01f)
             face = move > 0f ? 1f : -1f;
@@ -289,7 +293,9 @@ public class PlayerController : MonoBehaviour
         if (attackFrames == null || attackFrames.Length == 0)
             return;
 
-        bool pressed = Input.GetMouseButtonDown(0)
+        bool clickOnUi = UnityEngine.EventSystems.EventSystem.current != null
+                         && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+        bool pressed = (Input.GetMouseButtonDown(0) && !clickOnUi)
                     || Input.GetKeyDown(KeyCode.J)
                     || Input.GetKeyDown(KeyCode.K);
         if (!pressed)

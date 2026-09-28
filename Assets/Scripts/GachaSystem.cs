@@ -68,6 +68,7 @@ public class GachaSystem : MonoBehaviour
     string charTab = "Атрибуты";
     readonly Dictionary<string, Image> tabButtons = new Dictionary<string, Image>();
     bool animating;
+    public static bool IsMenuOpen { get; private set; }
 
     static readonly Color Gold = new Color(1f, 0.78f, 0.35f);
     static readonly Color Purple = new Color(0.72f, 0.5f, 1f);
@@ -524,8 +525,9 @@ public class GachaSystem : MonoBehaviour
 
     void UpdatePause()
     {
+        bool any = wishPanel.activeSelf || charPanel.activeSelf || resultPanel.activeSelf || animating;
+        IsMenuOpen = any;
         if (!pauseWhileOpen) return;
-        bool any = wishPanel.activeSelf || charPanel.activeSelf || resultPanel.activeSelf;
         Time.timeScale = any ? 0f : 1f;
         hud.SetActive(!any);
     }
