@@ -55,6 +55,8 @@ public class GachaSystem : MonoBehaviour
     bool guaranteed;
     Dictionary<string, int> owned = new Dictionary<string, int>(); // имя -> кол-во копий
     const string SaveKey = "GachaSave_v1";
+    static GachaSystem instance; // для наград из Damageable
+    bool hudGemIcon;             // в HUD счётчика нарисован спрайт алмаза
 
     [Serializable] class SaveData
     {
