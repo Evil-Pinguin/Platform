@@ -85,10 +85,36 @@ public class GachaSystem : MonoBehaviour
 
     void Awake()
     {
+        LoadCharactersFromResources();
         if (characters.Count == 0) FillDefaultRoster();
         font = Resources.GetBuiltinResource<Font>("Arial.ttf");
         Load();
         BuildUI();
+    }
+
+    // Каждая картинка из папки Assets/Resources/Characters становится легендарным (5★)
+    // персонажем. Имя берётся из имени файла: «Лилия.png» -> «Лилия».
+    void LoadCharactersFromResources()
+    {
+        var textures = Resources.LoadAll<Texture2D>("Characters");
+        if (textures.Length == 0) return;
+        Array.Sort(textures, (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+        var elements = (Element[])Enum.GetValues(typeof(Element));
+        foreach (var tex in textures)
+        {
+            if (characters.Exists(c => c.name == tex.name)) continue;
+            var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100);
+            characters.Add(new CharacterData
+            {
+                name = tex.name,
+                rarity = 5,
+                element = elements[Mathf.Abs(tex.name.GetHashCode()) % elements.Length],
+                portrait = sprite,
+                description = "Легендарный персонаж."
+            });
+        }
+        if (!characters.Exists(c => c.name == featuredCharacter && c.rarity == 5))
+            featuredCharacter = characters.Find(c => c.rarity == 5).name;
     }
 
     void FillDefaultRoster()
