@@ -151,6 +151,7 @@ public class GachaSystem : MonoBehaviour
         activeCharacter = PlayerPrefs.GetString(ActiveKey, mainHeroine);
         if (!owned.ContainsKey(activeCharacter) || !IsPlayable(activeCharacter)) activeCharacter = mainHeroine;
         ApplyActive();
+        RefreshPortrait();
     }
 
     bool IsPlayable(string name)
@@ -424,6 +425,80 @@ public class GachaSystem : MonoBehaviour
         prt.anchoredPosition = new Vector2(-30, -140); prt.sizeDelta = new Vector2(220, 40);
         primoHudText = MakeText(primo.transform, "", 24, TextAnchor.MiddleCenter, Color.white);
         Stretch(primoHudText.rectTransform);
+
+        BuildActivePortrait();
+    }
+
+    // Как в Genshin: портрет активного персонажа в правом нижнем углу.
+    // Клик открывает галерею персонажей (как кликом по портрету в Genshin).
+    void BuildActivePortrait()
+    {
+        var holder = new GameObject("ActivePortrait", typeof(RectTransform)).GetComponent<RectTransform>();
+        holder.SetParent(hud.transform, false);
+        holder.anchorMin = holder.anchorMax = holder.pivot = new Vector2(1, 0);
+        holder.anchoredPosition = new Vector2(-30, 28);
+        holder.sizeDelta = new Vector2(150, 190);
+
+        var frame = MakePanel(holder, "Frame", new Color(0.12f, 0.13f, 0.2f, 0.85f));
+        frame.sprite = CircleSprite();
+        frame.rectTransform.anchoredPosition = new Vector2(0, 45); frame.rectTransform.sizeDelta = new Vector2(118, 118);
+
+        // Круглая маска — портрет обрезается в кружок, как иконки Genshin
+        var clip = MakePanel(frame.transform, "Clip", Color.white);
+        clip.sprite = CircleSprite();
+        clip.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        Stretch(clip.rectTransform);
+        portraitImg = MakePanel(clip.transform, "Portrait", new Color(1, 1, 1, 0.05f));
+        portraitImg.raycastTarget = false;
+        Stretch(portraitImg.rectTransform);
+        portraitLetter = MakeText(portraitImg.transform, "", 48, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.9f));
+        Stretch(portraitLetter.rectTransform);
+
+        portraitRing = MakePanel(frame.transform, "Ring", Gold);
+        portraitRing.sprite = RingSprite(); portraitRing.raycastTarget = false;
+        Stretch(portraitRing.rectTransform);
+
+        portraitName = MakeText(holder, "", 20, TextAnchor.MiddleCenter, Color.white);
+        portraitName.rectTransform.anchoredPosition = new Vector2(0, -14);
+        portraitName.rectTransform.sizeDelta = new Vector2(170, 28);
+        portraitName.gameObject.AddComponent<Shadow>();
+
+        var btn = frame.gameObject.AddComponent<Button>();
+        btn.targetGraphic = frame;
+        var cb = btn.colors; cb.highlightedColor = new Color(1.25f, 1.25f, 1.25f); btn.colors = cb;
+        btn.onClick.AddListener(() => Toggle(charPanel));
+
+        RefreshPortrait();
+    }
+
+    // Перерисовывает портрет под текущего активного персонажа
+    void RefreshPortrait()
+    {
+        if (portraitImg == null) return;
+        var c = characters.Find(x => x.name == activeCharacter);
+        if (c == null)
+        {
+            portraitImg.sprite = null; portraitImg.color = new Color(1, 1, 1, 0.05f);
+            portraitLetter.text = ""; portraitRing.color = Gold; portraitName.text = "";
+            return;
+        }
+        Color el = ElementColor(c.element);
+        if (c.portrait != null)
+        {
+            portraitImg.type = Image.Type.Simple;
+            portraitImg.sprite = c.portrait; portraitImg.color = Color.white;
+            portraitImg.preserveAspect = true;
+            portraitLetter.text = "";
+        }
+        else
+        {
+            portraitImg.type = Image.Type.Simple;
+            portraitImg.sprite = CircleSprite(); portraitImg.preserveAspect = false;
+            portraitImg.color = el * 0.7f + new Color(0, 0, 0, 0.3f);
+            portraitLetter.text = c.name.Substring(0, 1);
+        }
+        portraitRing.color = el;
+        portraitName.text = c.name;
     }
 
     void MakeHudIcon(Transform parent, string glyph, string label, string key, Color accent, Action onClick)
@@ -686,6 +761,7 @@ public class GachaSystem : MonoBehaviour
         primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
                         (guaranteed && !allCharactersEqual ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
+        RefreshPortrait();
     }
 
     void RebuildCharacterList()
