@@ -488,7 +488,7 @@ public class GachaSystem : MonoBehaviour
         {
             // все 5★ в ряд на правой части баннера
             var five = characters.FindAll(c => c.rarity == 5);
-            float areaW = 740f, x0 = 650f - areaW / 2f - 20f;
+            float areaW = 740f, x0 = -95f; // правая часть баннера: от края красной полосы до правого края
             float w = five.Count > 0 ? areaW / five.Count : areaW;
             for (int i = 0; i < five.Count; i++)
             {
