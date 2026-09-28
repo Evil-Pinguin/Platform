@@ -36,6 +36,10 @@ public class GachaSystem : MonoBehaviour
     public int startPrimogems = 1000000;
     public int wishCost = 160;
 
+    [Header("Награды")]
+    [Tooltip("Сколько алмазов за уничтоженный объект (Damageable)")]
+    public int destroyReward = 5;
+
     [Header("Шансы (как в Genshin)")]
     public float fiveStarBase = 0.006f;
     public int softPityStart = 74;
@@ -51,6 +55,8 @@ public class GachaSystem : MonoBehaviour
     bool guaranteed;
     Dictionary<string, int> owned = new Dictionary<string, int>(); // имя -> кол-во копий
     const string SaveKey = "GachaSave_v1";
+    static GachaSystem instance; // для наград из Damageable
+    bool hudGemIcon;             // в HUD счётчика нарисован спрайт алмаза
 
     [Serializable] class SaveData
     {
@@ -85,6 +91,13 @@ public class GachaSystem : MonoBehaviour
     Skin defaultSkin;
     Button playButton; Text playButtonText;
 
+    // ---------- быстрый выбор персонажа справа (как в Genshin) ----------
+    // Столбец кружков на правом краю экрана: показывает всех играбельных
+    // персонажей (сейчас их 3 — Лилия, Айыына, Күн Куо), кликом меняем персонажа.
+    // Клавиши 1…5 заняты способностями (PlayerController), поэтому переключение мышью.
+    List<CharacterData> party = new List<CharacterData>();
+    Image[] partyCell, partyRing, partyGlow;
+
     static readonly Color Gold = new Color(1f, 0.78f, 0.35f);
     static readonly Color Purple = new Color(0.72f, 0.5f, 1f);
     static readonly Color Blue = new Color(0.45f, 0.7f, 1f);
@@ -100,6 +113,7 @@ public class GachaSystem : MonoBehaviour
 
     void Awake()
     {
+        instance = this;
         LoadCharactersFromResources();
         if (characters.Count == 0) FillDefaultRoster();
         font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -149,8 +163,10 @@ public class GachaSystem : MonoBehaviour
             defaultSkin = new Skin { idle = pc.idleSprite, guard = pc.guardSprite, walk = pc.walkFrames,
                                      jump = pc.jumpFrames, attack = pc.attackFrames, fall = pc.fallAttackFrames, fps = pc.walkFps };
         activeCharacter = PlayerPrefs.GetString(ActiveKey, mainHeroine);
-        if (!owned.ContainsKey(activeCharacter) || !IsPlayable(activeCharacter)) activeCharacter = mainHeroine;
+        // достаточно быть играбельным (есть спрайты) — выбор из панели справа сохраняется
+        if (!IsPlayable(activeCharacter)) activeCharacter = mainHeroine;
         ApplyActive();
+        RefreshPartyBar();
     }
 
     bool IsPlayable(string name)
@@ -195,6 +211,7 @@ public class GachaSystem : MonoBehaviour
         PlayerPrefs.Save();
         ApplyActive();
         RefreshCharacterInfo();
+        RefreshPartyBar();
     }
 
     void FillDefaultRoster()
@@ -272,6 +289,75 @@ public class GachaSystem : MonoBehaviour
         Save();
         RefreshTexts();
         StartCoroutine(WishAnimation(results));
+    }
+
+    // =================== НАГРАДА ЗА УНИЧТОЖЕНИЕ ОБЪЕКТОВ ===================
+
+    // Вызывается Damageable, когда объект уничтожен: начисляет destroyReward
+    // алмазов и показывает всплывающий значок в точке смерти объекта.
+    public static void RewardDestroy(Vector2 worldPos)
+    {
+        if (instance == null) instance = FindObjectOfType<GachaSystem>();
+        if (instance == null) return;
+        instance.AddGems(instance.destroyReward, worldPos);
+    }
+
+    void AddGems(int amount, Vector2 worldPos)
+    {
+        if (amount <= 0) return;
+        primogems += amount;
+        Save();
+        RefreshTexts();
+        SpawnGemPopup(amount, worldPos);
+    }
+
+    // «+5» с неогранённым алмазом: всплывает вверх и гаснет
+    void SpawnGemPopup(int amount, Vector2 worldPos)
+    {
+        if (canvas == null) return;
+        var go = new GameObject("GemPopup", typeof(RectTransform));
+        go.transform.SetParent(canvas.transform, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+
+        var cam = Camera.main;
+        Vector2 sp = cam != null ? (Vector2)cam.WorldToScreenPoint(worldPos) : (Vector2)worldPos;
+        Vector2 local;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvas.transform as RectTransform, sp, null, out local))
+            rt.anchoredPosition = local;
+
+        var gem = Resources.Load<Sprite>("UI/RoughDiamond");
+        if (gem != null)
+        {
+            var icon = MakePanel(go.transform, "Gem", Color.white);
+            icon.raycastTarget = false; icon.sprite = gem; icon.preserveAspect = true;
+            CenterIn(icon.rectTransform);
+            icon.rectTransform.sizeDelta = new Vector2(44, 44);
+            icon.rectTransform.anchoredPosition = new Vector2(-32, 0);
+        }
+        var label = MakeText(go.transform, "+" + amount, 30, TextAnchor.MiddleLeft, Gold);
+        CenterIn(label.rectTransform);
+        label.rectTransform.sizeDelta = new Vector2(60, 44);
+        label.rectTransform.anchoredPosition = new Vector2(24, 0);
+        label.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.85f);
+
+        StartCoroutine(GemPopupAnim(go, rt));
+    }
+
+    IEnumerator GemPopupAnim(GameObject go, RectTransform rt)
+    {
+        var cg = go.AddComponent<CanvasGroup>();
+        Vector2 start = rt.anchoredPosition;
+        float t = 0;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = t;
+            rt.anchoredPosition = start + new Vector2(0f, 90f * k);
+            cg.alpha = k < 0.65f ? 1f : 1f - (k - 0.65f) / 0.35f;
+            yield return null;
+        }
+        Destroy(go);
     }
 
     // =================== АНИМАЦИЯ МОЛИТВЫ ===================
@@ -424,6 +510,22 @@ public class GachaSystem : MonoBehaviour
         prt.anchoredPosition = new Vector2(-30, -140); prt.sizeDelta = new Vector2(220, 40);
         primoHudText = MakeText(primo.transform, "", 24, TextAnchor.MiddleCenter, Color.white);
         Stretch(primoHudText.rectTransform);
+
+        // значок неогранённого алмаза слева от счётчика
+        var gemSp = Resources.Load<Sprite>("UI/RoughDiamond");
+        if (gemSp != null)
+        {
+            hudGemIcon = true;
+            var icon = MakePanel(primo.transform, "Gem", Color.white);
+            icon.raycastTarget = false; icon.sprite = gemSp; icon.preserveAspect = true;
+            var irt = icon.rectTransform;
+            irt.anchorMin = irt.anchorMax = irt.pivot = new Vector2(0f, 0.5f);
+            irt.anchoredPosition = new Vector2(5, 0); irt.sizeDelta = new Vector2(30, 30);
+            var trt = primoHudText.rectTransform;
+            trt.offsetMin = new Vector2(40, trt.offsetMin.y);
+        }
+
+        BuildPartyBar();
     }
 
     void MakeHudIcon(Transform parent, string glyph, string label, string key, Color accent, Action onClick)
@@ -447,6 +549,101 @@ public class GachaSystem : MonoBehaviour
         btn.targetGraphic = circle;
         var cb = btn.colors; cb.highlightedColor = new Color(1.3f, 1.3f, 1.3f); btn.colors = cb;
         btn.onClick.AddListener(() => onClick());
+    }
+
+    // Столбец кружков-персонажей у правого края экрана — быстрый выбор партии, как в Genshin.
+    void BuildPartyBar()
+    {
+        // все играбельные персонажи; основная героиня — первым слотом
+        party.Clear();
+        foreach (var c in characters) if (IsPlayable(c.name)) party.Add(c);
+        var mh = party.Find(c => c.name == mainHeroine);
+        if (mh != null) { party.Remove(mh); party.Insert(0, mh); }
+
+        var bar = new GameObject("PartyBar", typeof(RectTransform)).GetComponent<RectTransform>();
+        bar.SetParent(hud.transform, false);
+        bar.anchorMin = bar.anchorMax = bar.pivot = new Vector2(1, 0.5f);
+        bar.anchoredPosition = new Vector2(-40, -10);
+        bar.sizeDelta = new Vector2(120, 340);
+        var vl = bar.gameObject.AddComponent<VerticalLayoutGroup>();
+        vl.spacing = 16; vl.childAlignment = TextAnchor.MiddleCenter;
+        vl.childControlWidth = vl.childControlHeight = false;
+        vl.childForceExpandWidth = vl.childForceExpandHeight = false;
+
+        partyCell = new Image[party.Count];
+        partyRing = new Image[party.Count];
+        partyGlow = new Image[party.Count];
+
+        for (int i = 0; i < party.Count; i++)
+        {
+            var c = party[i];
+            int idx = i;
+
+            // держатель ячейки (его задаёт layout, сам он картинку не рисует)
+            var holder = new GameObject(c.name + "Slot", typeof(RectTransform));
+            holder.transform.SetParent(bar, false);
+            CenterIn(holder.GetComponent<RectTransform>());
+            holder.GetComponent<RectTransform>().sizeDelta = new Vector2(100, 100);
+
+            // кружок с маской — портрет кадрируется по кругу, лицо по центру
+            var cell = MakePanel(holder.transform, c.name, new Color(0.07f, 0.08f, 0.12f, 0.92f));
+            cell.sprite = CircleSprite();
+            CenterIn(cell.rectTransform);
+            cell.rectTransform.sizeDelta = new Vector2(92, 92);
+            cell.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+            if (c.portrait != null) AddPartyPortrait(cell, c);
+            else
+            {
+                cell.color = ElementColor(c.element) * 0.8f;
+                var lt = MakeText(cell.transform, c.name.Substring(0, 1), 44, TextAnchor.MiddleCenter, Color.white);
+                Stretch(lt.rectTransform);
+            }
+
+            // обводка: активный персонаж — золотая, остальные — цвета стихии
+            var ring = MakePanel(cell.transform, "Ring", ElementColor(c.element));
+            ring.sprite = RingSprite(); ring.raycastTarget = false; Stretch(ring.rectTransform);
+
+            // золотое свечение активного персонажа (вне маски, поверх кружка)
+            var glow = MakePanel(holder.transform, "Glow", new Color(1f, 0.85f, 0.5f, 0.95f));
+            glow.sprite = RingSprite(); glow.raycastTarget = false;
+            CenterIn(glow.rectTransform);
+            glow.rectTransform.sizeDelta = new Vector2(106, 106);
+
+            partyCell[i] = cell; partyRing[i] = ring; partyGlow[i] = glow;
+
+            var btn = cell.gameObject.AddComponent<Button>();
+            btn.targetGraphic = cell;
+            btn.onClick.AddListener(() => SelectAsPlayer(party[idx].name));
+        }
+        RefreshPartyBar();
+    }
+
+    // Кадрирование портрета в кружке: квадрат 45% длинной стороны портрета,
+    // центр — на лице (примерно 16% высоты от верха; для всех портретов в папке сходится).
+    void AddPartyPortrait(Image cell, CharacterData c)
+    {
+        float nw = c.portrait.rect.width, nh = c.portrait.rect.height;
+        float side = 0.45f * Mathf.Max(nw, nh);
+        float cx = Mathf.Clamp(nw * 0.5f, side * 0.5f, nw - side * 0.5f);
+        float cy = Mathf.Clamp(nh * 0.16f, side * 0.5f, nh - side * 0.5f);
+        float k = cell.rectTransform.sizeDelta.x / side;
+        var p = MakePanel(cell.transform, "Portrait", Color.white);
+        p.raycastTarget = false; p.sprite = c.portrait; p.preserveAspect = false;
+        var rt = p.rectTransform;
+        CenterIn(rt);
+        rt.sizeDelta = new Vector2(nw * k, nh * k);
+        rt.anchoredPosition = new Vector2((nw * 0.5f - cx) * k, (cy - nh * 0.5f) * k);
+    }
+
+    void RefreshPartyBar()
+    {
+        if (partyCell == null) return;
+        for (int i = 0; i < partyCell.Length && i < party.Count; i++)
+        {
+            bool active = !string.IsNullOrEmpty(activeCharacter) && party[i].name == activeCharacter;
+            partyRing[i].color = active ? Gold : ElementColor(party[i].element);
+            partyGlow[i].gameObject.SetActive(active);
+        }
     }
 
     void BuildWishPanel()
@@ -682,8 +879,9 @@ public class GachaSystem : MonoBehaviour
 
     void RefreshTexts()
     {
-        string p = "◆ " + primogems.ToString("N0");
-        primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
+        string p = primogems.ToString("N0");
+        primoHudText.text = hudGemIcon ? p : "◆ " + p; // в HUD значок рисуется картинкой
+        primoWishText.text = "Алмазы: ◆ " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
                         (guaranteed && !allCharactersEqual ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
     }
@@ -837,6 +1035,13 @@ public class GachaSystem : MonoBehaviour
     static void Stretch(RectTransform rt)
     {
         rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
+    }
+
+    // Якоря в центре родителя, без смещения — для элементов внутри layout-контейнеров
+    static void CenterIn(RectTransform rt)
+    {
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
     }
 
     static void TopLeft(RectTransform rt, Vector2 pos, Vector2 size)
