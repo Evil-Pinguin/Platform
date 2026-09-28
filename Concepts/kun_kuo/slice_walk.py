@@ -1,8 +1,9 @@
-"""Split Kun Kuo's generated walk and 4-hit attack sheets into Unity sprites.
+"""Split Kun Kuo's generated walk, jump, and 4-hit attack sheets into sprites.
 
 Requires ImageMagick's `convert`. Green matte pixels are removed and the
 color spill is un-mixed from anti-aliased edges before writing RGBA PNGs.
 Attack sheet columns are the four combo moves; rows are wind-up and impact.
+The jump sheet reuses its first and third top-row cells for ascent and descent.
 """
 from pathlib import Path
 import shutil
@@ -10,6 +11,7 @@ import subprocess
 
 HERE = Path(__file__).resolve().parent
 WALK_SHEET = HERE / "walk_sheet_chroma.png"
+JUMP_SHEET = HERE / "jump_sheet_chroma.png"
 ATTACK_SHEET = HERE / "attack_sheet_chroma.png"
 OUT = HERE.parent.parent / "Assets" / "Resources" / "Playable" / "Күн Куо"
 CELL_W, CELL_H = 344, 384
@@ -62,12 +64,17 @@ def main():
         slice_cell(WALK_SHEET, col, row, OUT / f"walk_{frame + 1}.png")
     shutil.copyfile(OUT / "walk_2.png", OUT / "idle_front.png")
 
+    # The generated jump sheet has repeated filler cells in the same 4x2 layout
+    # as the walk sheet. Its top-left cell is ascent; top-row column 3 is descent.
+    for frame, col in enumerate((0, 2), start=1):
+        slice_cell(JUMP_SHEET, col, 0, OUT / f"jump_{frame}.png")
+
     for attack in range(4):
         for stage in range(2):
             slice_cell(ATTACK_SHEET, attack, stage,
                        OUT / f"combo_{attack + 1}_{stage + 1}.png")
 
-    print(f"Wrote idle, eight walk frames, and four two-frame combos to {OUT}")
+    print(f"Wrote idle, eight walk frames, two jump frames, and four two-frame combos to {OUT}")
 
 
 if __name__ == "__main__":
