@@ -36,6 +36,10 @@ public class GachaSystem : MonoBehaviour
     public int startPrimogems = 1000000;
     public int wishCost = 160;
 
+    [Header("Награды")]
+    [Tooltip("Сколько алмазов за уничтоженный объект (Damageable)")]
+    public int destroyReward = 5;
+
     [Header("Шансы (как в Genshin)")]
     public float fiveStarBase = 0.006f;
     public int softPityStart = 74;
@@ -107,6 +111,7 @@ public class GachaSystem : MonoBehaviour
 
     void Awake()
     {
+        instance = this;
         LoadCharactersFromResources();
         if (characters.Count == 0) FillDefaultRoster();
         font = Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -284,6 +289,75 @@ public class GachaSystem : MonoBehaviour
         StartCoroutine(WishAnimation(results));
     }
 
+    // =================== НАГРАДА ЗА УНИЧТОЖЕНИЕ ОБЪЕКТОВ ===================
+
+    // Вызывается Damageable, когда объект уничтожен: начисляет destroyReward
+    // алмазов и показывает всплывающий значок в точке смерти объекта.
+    public static void RewardDestroy(Vector2 worldPos)
+    {
+        if (instance == null) instance = FindObjectOfType<GachaSystem>();
+        if (instance == null) return;
+        instance.AddGems(instance.destroyReward, worldPos);
+    }
+
+    void AddGems(int amount, Vector2 worldPos)
+    {
+        if (amount <= 0) return;
+        primogems += amount;
+        Save();
+        RefreshTexts();
+        SpawnGemPopup(amount, worldPos);
+    }
+
+    // «+5» с неогранённым алмазом: всплывает вверх и гаснет
+    void SpawnGemPopup(int amount, Vector2 worldPos)
+    {
+        if (canvas == null) return;
+        var go = new GameObject("GemPopup", typeof(RectTransform));
+        go.transform.SetParent(canvas.transform, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+
+        var cam = Camera.main;
+        Vector2 sp = cam != null ? (Vector2)cam.WorldToScreenPoint(worldPos) : (Vector2)worldPos;
+        Vector2 local;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvas.transform as RectTransform, sp, null, out local))
+            rt.anchoredPosition = local;
+
+        var gem = Resources.Load<Sprite>("UI/RoughDiamond");
+        if (gem != null)
+        {
+            var icon = MakePanel(go.transform, "Gem", Color.white);
+            icon.raycastTarget = false; icon.sprite = gem; icon.preserveAspect = true;
+            CenterIn(icon.rectTransform);
+            icon.rectTransform.sizeDelta = new Vector2(44, 44);
+            icon.rectTransform.anchoredPosition = new Vector2(-32, 0);
+        }
+        var label = MakeText(go.transform, "+" + amount, 30, TextAnchor.MiddleLeft, Gold);
+        CenterIn(label.rectTransform);
+        label.rectTransform.sizeDelta = new Vector2(60, 44);
+        label.rectTransform.anchoredPosition = new Vector2(24, 0);
+        label.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.85f);
+
+        StartCoroutine(GemPopupAnim(go, rt));
+    }
+
+    IEnumerator GemPopupAnim(GameObject go, RectTransform rt)
+    {
+        var cg = go.AddComponent<CanvasGroup>();
+        Vector2 start = rt.anchoredPosition;
+        float t = 0;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = t;
+            rt.anchoredPosition = start + new Vector2(0f, 90f * k);
+            cg.alpha = k < 0.65f ? 1f : 1f - (k - 0.65f) / 0.35f;
+            yield return null;
+        }
+        Destroy(go);
+    }
+
     // =================== АНИМАЦИЯ МОЛИТВЫ ===================
 
     IEnumerator WishAnimation(List<CharacterData> results)
@@ -434,6 +508,20 @@ public class GachaSystem : MonoBehaviour
         prt.anchoredPosition = new Vector2(-30, -140); prt.sizeDelta = new Vector2(220, 40);
         primoHudText = MakeText(primo.transform, "", 24, TextAnchor.MiddleCenter, Color.white);
         Stretch(primoHudText.rectTransform);
+
+        // значок неогранённого алмаза слева от счётчика
+        var gemSp = Resources.Load<Sprite>("UI/RoughDiamond");
+        if (gemSp != null)
+        {
+            hudGemIcon = true;
+            var icon = MakePanel(primo.transform, "Gem", Color.white);
+            icon.raycastTarget = false; icon.sprite = gemSp; icon.preserveAspect = true;
+            var irt = icon.rectTransform;
+            irt.anchorMin = irt.anchorMax = irt.pivot = new Vector2(0f, 0.5f);
+            irt.anchoredPosition = new Vector2(5, 0); irt.sizeDelta = new Vector2(30, 30);
+            var trt = primoHudText.rectTransform;
+            trt.offsetMin = new Vector2(40, trt.offsetMin.y);
+        }
 
         BuildPartyBar();
     }
@@ -789,8 +877,9 @@ public class GachaSystem : MonoBehaviour
 
     void RefreshTexts()
     {
-        string p = "◆ " + primogems.ToString("N0");
-        primoHudText.text = p; primoWishText.text = "Алмазы: " + p;
+        string p = primogems.ToString("N0");
+        primoHudText.text = hudGemIcon ? p : "◆ " + p; // в HUD значок рисуется картинкой
+        primoWishText.text = "Алмазы: ◆ " + p;
         pityText.text = "Молитв до гаранта 5★: " + (hardPity - pity5) + "    |    Всего молитв: " + totalWishes +
                         (guaranteed && !allCharactersEqual ? "\nСледующий 5★ — гарантированно " + featuredCharacter : "");
     }
