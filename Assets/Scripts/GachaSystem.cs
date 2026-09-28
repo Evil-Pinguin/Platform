@@ -82,8 +82,22 @@ public class GachaSystem : MonoBehaviour
     string activeCharacter;
     const string ActiveKey = "GachaActiveCharacter";
     class Skin { public Sprite idle, guard; public Sprite[] walk, jump, attack, fall; public float fps; }
+    class PartySlotView
+    {
+        public string characterName;
+        public Image card;
+        public Image frame;
+        public Image portrait;
+        public Text nameLabel;
+        public Text hintLabel;
+    }
+
+    const string WindHeroine = "Айыына";
+    const string PyroHeroine = "Күн Куо";
     Skin defaultSkin;
     Button playButton; Text playButtonText;
+    RectTransform partyHudRoot;
+    readonly List<PartySlotView> partySlots = new List<PartySlotView>();
 
     static readonly Color Gold = new Color(1f, 0.78f, 0.35f);
     static readonly Color Purple = new Color(0.72f, 0.5f, 1f);
@@ -151,6 +165,7 @@ public class GachaSystem : MonoBehaviour
         activeCharacter = PlayerPrefs.GetString(ActiveKey, mainHeroine);
         if (!owned.ContainsKey(activeCharacter) || !IsPlayable(activeCharacter)) activeCharacter = mainHeroine;
         ApplyActive();
+        RefreshPartyHud();
     }
 
     bool IsPlayable(string name)
@@ -170,6 +185,25 @@ public class GachaSystem : MonoBehaviour
         return list.ToArray();
     }
 
+    static Sprite[][] LoadComboAttackSets(string name)
+    {
+        var combos = new Sprite[4][];
+        bool hasAnyFrames = false;
+        for (int attack = 1; attack <= combos.Length; attack++)
+        {
+            var frames = new List<Sprite>();
+            for (int frame = 1; frame <= 8; frame++)
+            {
+                var sprite = Resources.Load<Sprite>("Playable/" + name + "/combo_" + attack + "_" + frame);
+                if (sprite == null) break;
+                frames.Add(sprite);
+            }
+            combos[attack - 1] = frames.ToArray();
+            hasAnyFrames |= frames.Count > 0;
+        }
+        return hasAnyFrames ? combos : null;
+    }
+
     void ApplyActive()
     {
         var pc = FindObjectOfType<PlayerController>();
@@ -181,11 +215,57 @@ public class GachaSystem : MonoBehaviour
             return;
         }
         string n = activeCharacter;
-        pc.ApplySkin(Resources.Load<Sprite>("Playable/" + n + "/idle_front"), LoadFrames(n, "walk"), LoadFrames(n, "jump"),
-                     LoadFrames(n, "attack"), LoadFrames(n, "fall"), Resources.Load<Sprite>("Playable/" + n + "/guard_1"), 8f,
+        Sprite[] walk = LoadFrames(n, "walk");
+        Sprite[] jump = LoadFrames(n, "jump");
+        if (n == PyroHeroine)
+        {
+            // Загружаем оба кадра Күн Куо явно: пустой результат не должен
+            // подменяться прыжком Лилии, иначе героиня меняет облик в воздухе.
+            Sprite risingJump = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/jump_1");
+            Sprite fallingJump = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/jump_2");
+            var kunJump = new List<Sprite>();
+            if (risingJump != null) kunJump.Add(risingJump);
+            if (fallingJump != null) kunJump.Add(fallingJump);
+            if (kunJump.Count > 0) jump = kunJump.ToArray();
+        }
+        Sprite[] attack = LoadFrames(n, "attack");
+        Sprite[] fall = LoadFrames(n, "fall");
+        if (n == PyroHeroine)
+        {
+            Sprite fallStart = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/fall_1");
+            Sprite fallStrike = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/fall_2");
+            var kunFall = new List<Sprite>();
+            if (fallStart != null) kunFall.Add(fallStart);
+            if (fallStrike != null) kunFall.Add(fallStrike);
+            if (kunFall.Count > 0) fall = kunFall.ToArray();
+        }
+        Sprite guard = Resources.Load<Sprite>("Playable/" + n + "/guard_1");
+        // Missing animations may use the base set for other characters, but
+        // never let Lilia's jump or falling attack leak into Kun Kuo's skin.
+        if (defaultSkin != null)
+        {
+            if (jump.Length == 0 && n != PyroHeroine) jump = defaultSkin.jump;
+            if (attack.Length == 0) attack = defaultSkin.attack;
+            if (fall.Length == 0 && n != PyroHeroine) fall = defaultSkin.fall;
+            if (guard == null) guard = defaultSkin.guard;
+        }
+        if (n == PyroHeroine && jump.Length == 0)
+        {
+            Sprite ownIdle = Resources.Load<Sprite>("Playable/" + PyroHeroine + "/idle_front");
+            if (ownIdle != null) jump = new[] { ownIdle };
+            Debug.LogError("Күн Куо: jump_1/jump_2 не загрузились из Resources/Playable/" + PyroHeroine + "; не подставляю прыжок Лилии.");
+        }
+        if (n == PyroHeroine && fall.Length == 0)
+        {
+            fall = jump;
+            Debug.LogError("Күн Куо: fall_1/fall_2 не загрузились из Resources/Playable/" + PyroHeroine + "; не подставляю атаку Лилии.");
+        }
+        Sprite fly = Resources.Load<Sprite>("Playable/" + n + "/fly");
+        Sprite[][] combos = LoadComboAttackSets(n);
+        pc.ApplySkin(Resources.Load<Sprite>("Playable/" + n + "/idle_front"), walk, jump,
+                     attack, fall, guard, 8f,
                      // есть кадр fly — персонаж умеет летать (у Айыыны это раскрытые крылья)
-                     Resources.Load<Sprite>("Playable/" + n + "/fly") != null, Resources.Load<Sprite>("Playable/" + n + "/fly"),
-                     Resources.Load<Sprite>("Playable/" + n + "/glide"));
+                     fly != null, fly, Resources.Load<Sprite>("Playable/" + n + "/glide"), combos);
     }
 
     void SelectAsPlayer(string name)
@@ -194,12 +274,22 @@ public class GachaSystem : MonoBehaviour
         PlayerPrefs.SetString(ActiveKey, name);
         PlayerPrefs.Save();
         ApplyActive();
+        RefreshPartyHud();
         RefreshCharacterInfo();
+    }
+
+    void SelectPartyCharacter(string name)
+    {
+        if (name == activeCharacter || !owned.ContainsKey(name) || !IsPlayable(name))
+            return;
+        SelectAsPlayer(name);
     }
 
     void FillDefaultRoster()
     {
         characters.Add(new CharacterData { name = "Лилия", rarity = 5, element = Element.Пиро, description = "Героиня этого мира. Алая лилия, что расцветает в пламени." });
+        characters.Add(new CharacterData { name = WindHeroine, rarity = 5, element = Element.Анемо, description = "Крылатая героиня ветра. Может взлетать и планировать." });
+        characters.Add(new CharacterData { name = PyroHeroine, rarity = 5, element = Element.Пиро, description = "Күн Куо — воительница в сияющих серебряных доспехах, владеющая силой пламени." });
         characters.Add(new CharacterData { name = "Айрис", rarity = 5, element = Element.Гидро, description = "Странница, умеющая говорить с дождём." });
         characters.Add(new CharacterData { name = "Борей", rarity = 5, element = Element.Крио, description = "Молчаливый страж северных перевалов." });
         characters.Add(new CharacterData { name = "Сайла", rarity = 5, element = Element.Анемо, description = "Бард, чьи песни несёт ветер." });
@@ -213,6 +303,12 @@ public class GachaSystem : MonoBehaviour
     void Update()
     {
         if (animating) return;
+        if (!IsMenuOpen)
+        {
+            if (Input.GetKeyDown(KeyCode.F1)) SelectPartyCharacter(mainHeroine);
+            if (Input.GetKeyDown(KeyCode.F2)) SelectPartyCharacter(WindHeroine);
+            if (Input.GetKeyDown(KeyCode.F4)) SelectPartyCharacter(PyroHeroine);
+        }
         if (Input.GetKeyDown(KeyCode.F3)) Toggle(wishPanel);
         if (Input.GetKeyDown(KeyCode.C)) Toggle(charPanel);
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -271,6 +367,7 @@ public class GachaSystem : MonoBehaviour
         }
         Save();
         RefreshTexts();
+        RefreshPartyHud();
         StartCoroutine(WishAnimation(results));
     }
 
@@ -424,6 +521,135 @@ public class GachaSystem : MonoBehaviour
         prt.anchoredPosition = new Vector2(-30, -140); prt.sizeDelta = new Vector2(220, 40);
         primoHudText = MakeText(primo.transform, "", 24, TextAnchor.MiddleCenter, Color.white);
         Stretch(primoHudText.rectTransform);
+
+        BuildPartyHud();
+    }
+
+    // Отряд справа: портреты кликабельны; F1/F2/F4 переключают персонажей.
+    void BuildPartyHud()
+    {
+        BuildPartyHud(GetPartyCharacterNames());
+    }
+
+    void BuildPartyHud(string[] names)
+    {
+        if (partyHudRoot == null)
+        {
+            partyHudRoot = new GameObject("PartyRoster", typeof(RectTransform)).GetComponent<RectTransform>();
+            partyHudRoot.SetParent(hud.transform, false);
+            partyHudRoot.anchorMin = partyHudRoot.anchorMax = partyHudRoot.pivot = new Vector2(1f, 1f);
+            partyHudRoot.anchoredPosition = new Vector2(-24f, -205f);
+        }
+        else
+        {
+            foreach (Transform child in partyHudRoot)
+                Destroy(child.gameObject);
+        }
+
+        partySlots.Clear();
+        partyHudRoot.sizeDelta = new Vector2(220f, Mathf.Max(76f, names.Length * 86f));
+        for (int i = 0; i < names.Length; i++)
+        {
+            string characterName = names[i];
+            CharacterData character = characters.Find(c => c.name == characterName);
+            var card = MakePanel(partyHudRoot, "Party_" + characterName, new Color(0.06f, 0.08f, 0.12f, 0.82f));
+            card.sprite = RoundedSprite();
+            card.type = Image.Type.Sliced;
+            card.rectTransform.anchorMin = card.rectTransform.anchorMax = card.rectTransform.pivot = new Vector2(1f, 1f);
+            card.rectTransform.anchoredPosition = new Vector2(0f, -i * 86f);
+            card.rectTransform.sizeDelta = new Vector2(210f, 76f);
+
+            var btn = card.gameObject.AddComponent<Button>();
+            btn.targetGraphic = card;
+            btn.onClick.AddListener(() => SelectPartyCharacter(characterName));
+
+            var frame = MakePanel(card.transform, "PortraitFrame", Gold);
+            frame.sprite = RoundedSprite();
+            frame.type = Image.Type.Sliced;
+            frame.raycastTarget = false;
+            frame.rectTransform.anchorMin = frame.rectTransform.anchorMax = frame.rectTransform.pivot = new Vector2(1f, 0.5f);
+            frame.rectTransform.anchoredPosition = new Vector2(-5f, 0f);
+            frame.rectTransform.sizeDelta = new Vector2(64f, 64f);
+
+            var portrait = MakePanel(card.transform, "Portrait", character != null ? ElementColor(character.element) : Blue);
+            portrait.sprite = character != null && character.portrait != null ? character.portrait : RoundedSprite();
+            portrait.preserveAspect = true;
+            portrait.raycastTarget = false;
+            portrait.rectTransform.anchorMin = portrait.rectTransform.anchorMax = portrait.rectTransform.pivot = new Vector2(1f, 0.5f);
+            portrait.rectTransform.anchoredPosition = new Vector2(-9f, 0f);
+            portrait.rectTransform.sizeDelta = new Vector2(56f, 56f);
+
+            if (character == null || character.portrait == null)
+            {
+                var letter = MakeText(portrait.transform, characterName.Substring(0, 1), 30, TextAnchor.MiddleCenter, Color.white);
+                Stretch(letter.rectTransform);
+            }
+
+            var name = MakeText(card.transform, characterName, 22, TextAnchor.MiddleLeft, Color.white);
+            name.rectTransform.anchorMin = name.rectTransform.anchorMax = name.rectTransform.pivot = new Vector2(0f, 0.5f);
+            name.rectTransform.anchoredPosition = new Vector2(12f, 10f);
+            name.rectTransform.sizeDelta = new Vector2(122f, 28f);
+
+            var hint = MakeText(card.transform, PartyHotkey(characterName) + "  •  выбрать", 14, TextAnchor.MiddleLeft, Cream);
+            hint.rectTransform.anchorMin = hint.rectTransform.anchorMax = hint.rectTransform.pivot = new Vector2(0f, 0.5f);
+            hint.rectTransform.anchoredPosition = new Vector2(12f, -17f);
+            hint.rectTransform.sizeDelta = new Vector2(122f, 20f);
+
+            partySlots.Add(new PartySlotView
+            {
+                characterName = characterName,
+                card = card,
+                frame = frame,
+                portrait = portrait,
+                nameLabel = name,
+                hintLabel = hint
+            });
+        }
+
+        UpdatePartyHudVisuals();
+    }
+
+    string[] GetPartyCharacterNames()
+    {
+        var names = new List<string>();
+        names.Add(mainHeroine);
+        if (!names.Contains(WindHeroine)) names.Add(WindHeroine);
+        if (owned.ContainsKey(PyroHeroine) && IsPlayable(PyroHeroine) && !names.Contains(PyroHeroine))
+            names.Add(PyroHeroine);
+        return names.ToArray();
+    }
+
+    string PartyHotkey(string name)
+    {
+        if (name == mainHeroine) return "F1";
+        if (name == WindHeroine) return "F2";
+        return "F4"; // F3 уже открывает молитвы.
+    }
+
+    void RefreshPartyHud()
+    {
+        if (partyHudRoot == null) return;
+        string[] names = GetPartyCharacterNames();
+        bool rosterChanged = names.Length != partySlots.Count;
+        if (!rosterChanged)
+            for (int i = 0; i < names.Length; i++)
+                if (partySlots[i].characterName != names[i]) { rosterChanged = true; break; }
+        if (rosterChanged) BuildPartyHud(names);
+        else UpdatePartyHudVisuals();
+    }
+
+    void UpdatePartyHudVisuals()
+    {
+        foreach (var slot in partySlots)
+        {
+            if (slot == null || slot.card == null) continue;
+            bool active = slot.characterName == activeCharacter;
+            slot.card.color = active ? new Color(0.30f, 0.23f, 0.12f, 0.94f) : new Color(0.06f, 0.08f, 0.12f, 0.82f);
+            slot.frame.color = active ? Gold : new Color(0.72f, 0.76f, 0.82f, 0.85f);
+            slot.nameLabel.color = active ? Gold : Color.white;
+            slot.hintLabel.text = active ? "В игре" : PartyHotkey(slot.characterName) + "  •  выбрать";
+            slot.hintLabel.color = active ? new Color(0.9f, 0.88f, 0.78f) : new Color(0.78f, 0.81f, 0.87f);
+        }
     }
 
     void MakeHudIcon(Transform parent, string glyph, string label, string key, Color accent, Action onClick)
@@ -779,13 +1005,24 @@ public class GachaSystem : MonoBehaviour
     {
         owned.Clear();
         owned[mainHeroine] = 1; // основная героиня есть всегда, как Путешественник в Genshin
-        if (!PlayerPrefs.HasKey(SaveKey)) { primogems = startPrimogems; return; }
+        if (!PlayerPrefs.HasKey(SaveKey))
+        {
+            primogems = startPrimogems;
+            EnsureStarterParty();
+            return;
+        }
         var d = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
         primogems = d.primogems; pity5 = d.pity5; pity4 = d.pity4; totalWishes = d.totalWishes; guaranteed = d.guaranteed;
         // старое сохранение (до алмазов) — выдаём стартовый запас
         if (d.version < 2) { primogems += startPrimogems; Save(); }
         for (int i = 0; i < d.names.Count && i < d.counts.Count; i++) owned[d.names[i]] = d.counts[i];
+        EnsureStarterParty();
+    }
+
+    void EnsureStarterParty()
+    {
         if (!owned.ContainsKey(mainHeroine)) owned[mainHeroine] = 1;
+        if (!owned.ContainsKey(WindHeroine)) owned[WindHeroine] = 1;
     }
 
     [ContextMenu("Сбросить сохранение гачи")]

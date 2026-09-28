@@ -30,7 +30,7 @@ public class AbilityHud : MonoBehaviour
         float y = Screen.height - h * 5f - 24f * scale;
 
         GUI.Label(new Rect(x, y - 26f * scale, 420f * scale, 22f * scale),
-                  "1…5 — выбрать способность,   F — применить,   J или мышь — удар",
+                  "1–5 способность, F применить, J/мышь атака (Күн Куо: комбо ×4)",
                   hint);
 
         for (int i = 0; i < 5; i++)

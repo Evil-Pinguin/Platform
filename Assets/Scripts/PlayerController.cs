@@ -148,6 +148,13 @@ public class PlayerController : MonoBehaviour
     float attackStartedAt = -99f;
     bool attacking;
     bool fallingStrike;      // текущий удар — в падении, ножом вниз
+    Sprite[] currentAttackFrames;
+    Sprite[][] comboAttackSets;
+    int nextComboStep;
+    int activeComboStep = -1;
+    int queuedComboAttacks;
+    float comboExpiresAt;
+    const float ComboQueueWindow = 0.35f;
     readonly System.Collections.Generic.HashSet<Damageable> hitThisSwing =
         new System.Collections.Generic.HashSet<Damageable>();
     readonly System.Collections.Generic.HashSet<Damageable> hitThisDash =
@@ -170,18 +177,29 @@ public class PlayerController : MonoBehaviour
         startPosition = body.position;
     }
 
-    // Смена облика героини (персонаж из гачи). Любой пустой набор кадров
-    // оставляет прежний, чтобы игра не сломалась, если какого-то кадра нет.
+    // Смена облика героини (персонаж из гачи). Отсутствующие кадры сохраняют
+    // прежний набор; явно переданный пустой набор прыжка его очищает, чтобы
+    // кадры предыдущего персонажа не просачивались в новую анимацию.
     public void ApplySkin(Sprite idle, Sprite[] walk, Sprite[] jump,
                           Sprite[] attack, Sprite[] fall, Sprite guard, float walkFramesPerSecond,
-                          bool flying = false, Sprite fly = null, Sprite glide = null)
+                          bool flying = false, Sprite fly = null, Sprite glide = null,
+                          Sprite[][] comboAttacks = null)
     {
         canFly = flying;
+        comboAttackSets = comboAttacks != null && comboAttacks.Length >= 4 ? comboAttacks : null;
+        nextComboStep = 0;
+        activeComboStep = -1;
+        queuedComboAttacks = 0;
+        comboExpiresAt = 0f;
+        attacking = false;
+        fallingStrike = false;
+        currentAttackFrames = null;
         flySprite = fly;
         glideSprite = glide;
         if (idle != null) idleSprite = idle;
         if (walk != null && walk.Length > 0) walkFrames = walk;
-        if (jump != null && jump.Length > 0) jumpFrames = jump;
+        // A supplied empty jump array clears stale frames from the previous skin.
+        if (jump != null) jumpFrames = jump;
         if (attack != null && attack.Length > 0) attackFrames = attack;
         if (fall != null && fall.Length > 0) fallAttackFrames = fall;
         if (guard != null) guardSprite = guard;
@@ -349,38 +367,92 @@ public class PlayerController : MonoBehaviour
         IsGuarding = held && grounded && !attacking;
     }
 
+    bool AttackPressed()
+    {
+        bool clickOnUi = UnityEngine.EventSystems.EventSystem.current != null
+                         && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+        return (Input.GetMouseButtonDown(0) && !clickOnUi)
+            || Input.GetKeyDown(KeyCode.J)
+            || Input.GetKeyDown(KeyCode.K);
+    }
+
     void ReadAttackInput()
     {
+        bool pressed = AttackPressed();
         if (attacking)
         {
             float dur = fallingStrike ? fallAttackDuration : attackDuration;
+            bool comboCanContinue = !fallingStrike && activeComboStep >= 0
+                                    && comboAttackSets != null && grounded;
+            if (pressed && comboCanContinue)
+            {
+                int remainingHits = Mathf.Max(0, 3 - activeComboStep - queuedComboAttacks);
+                if (remainingHits > 0)
+                    queuedComboAttacks++;
+            }
+
             if (Time.time - attackStartedAt >= dur + attackCooldown)
             {
+                bool continueCombo = comboCanContinue && queuedComboAttacks > 0;
                 attacking = false;
                 fallingStrike = false;
+                currentAttackFrames = null;
                 animTimer = 0f;
                 shownFrame = -1;
+
+                if (continueCombo)
+                {
+                    queuedComboAttacks--;
+                    BeginAttack();
+                }
+                else
+                {
+                    queuedComboAttacks = 0;
+                    activeComboStep = -1;
+                }
             }
             return;
         }
 
-        if (attackFrames == null || attackFrames.Length == 0)
+        if (!pressed || (attackFrames == null && comboAttackSets == null))
             return;
 
-        bool clickOnUi = UnityEngine.EventSystems.EventSystem.current != null
-                         && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
-        bool pressed = (Input.GetMouseButtonDown(0) && !clickOnUi)
-                    || Input.GetKeyDown(KeyCode.J)
-                    || Input.GetKeyDown(KeyCode.K);
-        if (!pressed)
-            return;
+        BeginAttack();
+    }
 
-        // В воздухе — всегда удар сверху, и на подъёме, и на падении: наземный
-        // горизонтальный взмах в прыжке читался бы как ошибка. Проверка по
-        // grounded, а не по скорости: на вершине дуги скорость ещё вверх, но
-        // героиня уже в воздухе, и удар должен быть воздушным.
+    void BeginAttack()
+    {
+        // В воздухе — всегда удар сверху, и на подъёме, и на падении.
         fallingStrike = !grounded
                      && fallAttackFrames != null && fallAttackFrames.Length > 0;
+        activeComboStep = -1;
+
+        if (fallingStrike)
+        {
+            currentAttackFrames = fallAttackFrames;
+        }
+        else if (comboAttackSets != null && comboAttackSets.Length >= 4)
+        {
+            if (Time.time > comboExpiresAt)
+                nextComboStep = 0;
+            activeComboStep = nextComboStep;
+            nextComboStep = (nextComboStep + 1) % 4;
+            comboExpiresAt = Time.time + attackDuration + attackCooldown + ComboQueueWindow;
+            currentAttackFrames = comboAttackSets[activeComboStep];
+            if (currentAttackFrames == null || currentAttackFrames.Length == 0)
+                currentAttackFrames = attackFrames;
+        }
+        else
+        {
+            currentAttackFrames = attackFrames;
+        }
+
+        if (currentAttackFrames == null || currentAttackFrames.Length == 0)
+        {
+            fallingStrike = false;
+            activeComboStep = -1;
+            return;
+        }
 
         attacking = true;
         attackStartedAt = Time.time;
@@ -523,11 +595,27 @@ public class PlayerController : MonoBehaviour
 
         // Удар при падении достаёт вниз и вперёд, поэтому хитбокс ниже,
         // уже и вытянут по вертикали.
-        Vector2 centre = (Vector2)transform.position
-                       + new Vector2((fallingStrike ? fallHitboxCenterX : hitboxCenterX) * face,
-                                     fallingStrike ? fallHitboxCenterY : hitboxCenterY);
+        float centreX = fallingStrike ? fallHitboxCenterX : hitboxCenterX;
+        float centreY = fallingStrike ? fallHitboxCenterY : hitboxCenterY;
         Vector2 size = fallingStrike ? fallHitboxSize : hitboxSize;
         int damage = fallingStrike ? fallAttackDamage : attackDamage;
+
+        // У четырёх ударов Күн Куо разные области действия; четвёртый — усиленный финал.
+        if (!fallingStrike)
+        {
+            switch (activeComboStep)
+            {
+                case 0: centreX = 0.95f; centreY = 0.95f; size = new Vector2(1.35f, 1.2f); break;
+                case 1: centreX = 1.0f; centreY = 0.75f; size = new Vector2(1.8f, 1.3f); break;
+                case 2: centreX = 0f; centreY = 1.0f; size = new Vector2(2.2f, 2.0f); break;
+                case 3:
+                    centreX = 0.85f; centreY = 1.15f; size = new Vector2(1.8f, 2.2f);
+                    damage = attackDamage + 1;
+                    break;
+            }
+        }
+
+        Vector2 centre = (Vector2)transform.position + new Vector2(centreX * face, centreY);
 
         Collider2D[] hits = Physics2D.OverlapBoxAll(centre, size, 0f);
         foreach (Collider2D h in hits)
@@ -561,17 +649,17 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // Удар важнее ходьбы: пока он играется, кадры шага не показываем
-        if (attacking && attackFrames != null && attackFrames.Length > 0)
+        // Удар важнее ходьбы: у Күн Куо каждый шаг комбо со своими кадрами.
+        if (attacking && currentAttackFrames != null && currentAttackFrames.Length > 0)
         {
             animTimer += Time.deltaTime;
-            int f = (int)(animTimer / attackDuration * attackFrames.Length);
-            if (f >= attackFrames.Length)
-                f = attackFrames.Length - 1;
+            int f = (int)(animTimer / attackDuration * currentAttackFrames.Length);
+            if (f >= currentAttackFrames.Length)
+                f = currentAttackFrames.Length - 1;
             if (f != shownFrame)
             {
                 shownFrame = f;
-                spriteRenderer.sprite = attackFrames[f];
+                spriteRenderer.sprite = currentAttackFrames[f];
             }
             spriteRenderer.flipX = face < 0f;
             return;
@@ -666,5 +754,10 @@ public class PlayerController : MonoBehaviour
         // появились бы на земле, а считали бы себя в воздухе.
         attacking = false;
         fallingStrike = false;
+        currentAttackFrames = null;
+        activeComboStep = -1;
+        queuedComboAttacks = 0;
+        nextComboStep = 0;
+        comboExpiresAt = 0f;
     }
 }
