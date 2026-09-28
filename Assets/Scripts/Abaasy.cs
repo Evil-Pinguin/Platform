@@ -27,6 +27,8 @@ public class Abaasy : MonoBehaviour
     public float flameSpeed = 7f;
     [Tooltip("Урон пламени целям с Damageable")]
     public int flameDamage = 1;
+    [Tooltip("Урон пламени по здоровью героини (HeroHealth)")]
+    public int breathPlayerDamage = 1200;
     [Tooltip("Ниже этой высоты — упал в пропасть, исчезает без награды")]
     public float killY = -25f;
 
@@ -175,7 +177,7 @@ public class Abaasy : MonoBehaviour
         {
             float spread = (i - (breathFlames - 1) * 0.5f) * 0.14f;
             AbaasyFlame.Spawn(mouth, new Vector2(dir, spread).normalized * flameSpeed,
-                              transform, flameDamage);
+                              transform, flameDamage, breathPlayerDamage);
         }
     }
 }
@@ -186,11 +188,12 @@ public class AbaasyFlame : MonoBehaviour
 {
     Vector2 speed;
     Transform owner;
-    int damage;
+    int damage;        // по целям с Damageable (мишени, монстры)
+    int playerDamage;  // по здоровью героини
     float life = 1.1f;
     SpriteRenderer rend;
 
-    public static void Spawn(Vector2 pos, Vector2 speed, Transform owner, int damage)
+    public static void Spawn(Vector2 pos, Vector2 speed, Transform owner, int damage, int playerDamage)
     {
         var go = new GameObject("AbaasyFlame");
         go.transform.position = pos;
@@ -202,6 +205,7 @@ public class AbaasyFlame : MonoBehaviour
         f.speed = speed;
         f.owner = owner;
         f.damage = damage;
+        f.playerDamage = playerDamage;
         f.rend = r;
     }
 
@@ -235,19 +239,28 @@ public class AbaasyFlame : MonoBehaviour
     bool HitPlayer()
     {
         if (owner == null) return false;
-        var pc = owner.GetComponent<Abaasy>() != null ? FindTarget() : null;
+        var pc = FindTarget();
         if (pc == null) return false;
         if (((Vector2)pc.transform.position - (Vector2)transform.position).sqrMagnitude > 0.55f * 0.55f)
             return false;
 
-        if (!pc.IsGuarding)
+        // правая кнопка (защита) — пламя гаснет, урона нет
+        if (pc.IsGuarding) return true;
+
+        var hp = pc.GetComponent<HeroHealth>();
+        if (hp != null)
+        {
+            // урон по полоске здоровья + отброс и вспышка — внутри TakeDamage
+            hp.TakeDamage(playerDamage, (Vector2)transform.position - speed.normalized);
+        }
+        else
         {
             var rb = pc.GetComponent<Rigidbody2D>();
             if (rb != null)
                 rb.velocity = new Vector2(Mathf.Sign(speed.x != 0f ? speed.x : 1f) * 5.5f, 3f);
             pc.StartCoroutine(Flash(pc));
         }
-        return true; // в защите пламя всё равно гаснет об неё
+        return true;
     }
 
     // Красная вспышка героини от ожога — на её же объекте, переживёт Flame
