@@ -21,6 +21,8 @@ PNG = {
     '715ee93385374f0b96aa2d97ab5033cb': 'Assets/Art/Environment/ground.png',
     'b836230688a54cfe9c6e1d59eee2e42e': 'Assets/Art/Environment/block.png',
     '3d184408974c4b50961cd85749ce031c': 'Assets/Art/Environment/chasm.png',
+    'cc85d957593e436998557368842e4502': 'Assets/Art/Environment/tree_roots.png',
+    'a19548bbd0474e568263a15f636d6c8d': 'Assets/Art/Environment/secret_crystal.png',
     'e82b0731b1864b78a8e4394c0e57da08': 'Assets/Art/Environment/background_sky.png',
     'acd1ec0f7dd66712a76a7f4aa03de836': 'Assets/Art/Environment/Decor/spruce.png',
     'b017c5b7638bea95aacc23fe69524e10': 'Assets/Art/Environment/Decor/rocks.png',
@@ -73,6 +75,8 @@ for b in blocks:
     p = re.search(r'm_LocalPosition: \{x: ([-\d.]+), y: ([-\d.]+), z: ([-\d.]+)\}', t)
     parent = re.search(r'm_Father: \{fileID: (\d+)\}', t).group(1)
     r = fb('212', sr)
+    if re.search(r'^  m_Enabled: 0$', r, re.M):
+        continue  # секретный кристалл скрыт до открытия прохода
     sz = re.search(r'm_Size: \{x: ([-\d.]+), y: ([-\d.]+)\}', r)
     g = re.search(r'm_Sprite: \{fileID: \d+, guid: ([0-9a-f]{32})', r)
     if not (sz and g):
@@ -135,7 +139,7 @@ def render(camx, camy, herox, heroy, out):
                             src], check=True)
             img = tile(src, unit, w)
             ih = int(round(h * S))
-            if guid in GROUND_IDS:
+            if guid in TOP_PIVOT_IDS:
                 top = int(cy(y))                 # земля: верх холста = y
             elif guid in MID_IDS:
                 top = int(cy(y + h))             # берег: низ холста = y
@@ -169,17 +173,23 @@ def render(camx, camy, herox, heroy, out):
 TILE_UNITS = {'715ee93385374f0b96aa2d97ab5033cb': 4.0,
               'b836230688a54cfe9c6e1d59eee2e42e': 1.0,
               '2afd8a1670691ca60e7e3185170acb77': 31.68}   # берег, тайл 3168 px / 100
-GROUND_IDS = {'715ee93385374f0b96aa2d97ab5033cb', 'b836230688a54cfe9c6e1d59eee2e42e'}
+TOP_PIVOT_IDS = {'715ee93385374f0b96aa2d97ab5033cb'}  # block.png — центр
 MID_IDS = {'2afd8a1670691ca60e7e3185170acb77'}
 DECOR_IDS = {'acd1ec0f7dd66712a76a7f4aa03de836', 'b017c5b7638bea95aacc23fe69524e10',
              '5c2806664d4ba3f3f50b3741002bf34e', 'dfefd0bca0374f584c131084affd95aa'}
 
 VIEWS = [
     ('start',   -29.0, -0.27, -30.0, 0.031),
+    ('ledge',   -25.0,  1.50, -25.0, 1.831),
+    ('crumble', -18.25, 0.30, -19.8, 0.031),
     ('climb',   -10.0,  1.50, -11.0, 1.831),
     ('pit',      4.5,  0.60,   8.0, 0.031),
+    ('secret',   8.5, -0.20,   7.0, 0.031),
+    ('moving',  11.5,  0.30,  10.5, 1.031),
+    ('roots',   11.5, -2.00, -999.0, 0.0),
     ('bridge',  23.5,  0.30,  23.5, 0.031),
     ('crest',   39.0,  2.20,  40.0, 2.431),
+    ('dash_gap', 44.0, 2.20, 41.0, 2.431),
 ]
 for name_last, camx, camy, herox, heroy in VIEWS:
     render(camx, camy, herox, heroy, f'/tmp/v_{name_last}.png')

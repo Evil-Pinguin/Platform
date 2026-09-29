@@ -1,7 +1,7 @@
 """Перестраивает геометрию уровня в TestLevel.unity.
 
 Сцена уже содержит камеру, героиню и фон — их не трогаем. Скрипт
-вырезает всё, что сам же и добавлял (диапазон id 21xxxxxx…24xxxxxx),
+вырезает всё, что сам же и добавлял (id 21…29 и 42…47),
 и собирает заново, поэтому его можно запускать повторно.
 
 Пивоты из .meta (ошибка тут стоила 2.9 юнита — героиня висела в воздухе):
@@ -21,6 +21,12 @@ HUD_SCRIPT = 'e23ad8f0be0dfe87943e7b9135870f82'
 GROUND_GUID = '715ee93385374f0b96aa2d97ab5033cb'
 BLOCK_GUID = 'b836230688a54cfe9c6e1d59eee2e42e'
 CHASM_GUID = '3d184408974c4b50961cd85749ce031c'
+ROOTS_GUID = 'cc85d957593e436998557368842e4502'
+CRYSTAL_GUID = 'a19548bbd0474e568263a15f636d6c8d'
+PICKUP_GUID = '562d83646464472a92bc4a15fa70c885'
+SECRET_GUID = '1e5cb70f0925466b9c26ac0e35361f4b'
+MOVING_GUID = '7e36cb6efa424810af7c88a1c29ab6b9'
+CRUMBLING_GUID = 'caac8375845f4a9baaf6451b0eb64ea5'
 FX_GO, FX_TR, FX_SCRIPT = 440000001, 440000002, 440000003
 AMB_GO, AMB_TR, AMB_SCRIPT = 450000001, 450000002, 450000003
 IDLE_GUID = 'c46dd459691fd1dd598775d241a19a84'
@@ -71,9 +77,14 @@ CHASM_DEPTH = 6.0
 START_X = -30.0           # где встаёт героиня
 HERO_Y = 0.031           # её ступни в локальных координатах
 
+# Обычный прыжок при скорости 5 и высоте 2.2 покрывает ~3.87 юнита.
+# Финальный провал шире него; надёжный способ перелететь — прыжок с рывком (F).
+PIT_START, PIT_WIDTH = 42.0, 4.2
+
 # --- земля: имя, x0, x1, высота поверхности -------------------------
+# Дополнительные участки в конце списка сохраняют ID старых объектов сцены.
 GROUND = [
-    ('Ground_Start',   -32.0, -19.0,  0.0),   # стартовая поляна
+    ('Ground_Start',   -32.0, -25.4,  0.0),   # поляна до нового уступа
     ('Ground_Ledge1',  -17.5, -14.0,  0.9),   # уступ
     ('Ground_Ledge2',  -12.5,  -9.0,  1.8),   # уступ
     ('Ground_Plateau',  -7.5,  -2.5,  2.4),   # высокое плато, видно весь уровень
@@ -83,7 +94,12 @@ GROUND = [
     ('Ground_Far',     27.5,  29.0,  0.0),   # за ущельем
     ('Ground_Hill1',   30.5,  33.0,  1.0),   # подъём на холм
     ('Ground_Hill2',   34.5,  37.0,  2.0),
-    ('Ground_Crest',   38.5,  42.0,  2.4),   # гребень
+    ('Ground_Crest',   38.5, PIT_START, 2.4),  # гребень перед провалом
+    # Между деревом на x=-27 и сэргэ на x=-23.2: подъём на 1.8 (прыжок 2.2).
+    ('Ground_Raised', -25.4, -24.1, 1.8),
+    ('Ground_Start_East', -24.1, -19.0, 0.0),
+    # Нет коллайдера над пропастью: можно перелететь прыжком + рывком.
+    ('Ground_Landing', PIT_START + PIT_WIDTH, 52.0, 2.4),
 ]
 
 # --- платформы из плит: имя, x0, x1, низ ----------------------------
@@ -106,7 +122,10 @@ ORDER_BG = -10
 ORDER_TREE = -4
 ORDER_MIDGROUND = -3
 ORDER_CHASM = -1
+# Тёмный провал непрозрачный: корни нужно рисовать ПЕРЕД ним, но за плитами.
+ORDER_UNDERGROUND = 0
 ORDER_GROUND, ORDER_PLATFORM, ORDER_DECOR = 0, 1, 1
+ORDER_COLLECTIBLE, ORDER_SECRET_WALL = 2, 3
 
 COMMON_HEAD = """  m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -134,9 +153,10 @@ def transform(tid, gid, pos, order, father=0):
             "  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}\n")
 
 
-def sprite(sid, gid, guid, order, size, draw_mode, flip=0):
+def sprite(sid, gid, guid, order, size, draw_mode, flip=0,
+           color='1, g: 1, b: 1, a: 1', enabled=1):
     return (f"--- !u!212 &{sid}\nSpriteRenderer:\n" + COMMON_HEAD +
-            f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
+            f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: {enabled}\n"
             "  m_CastShadows: 0\n  m_ReceiveShadows: 0\n  m_DynamicOccludee: 1\n"
             "  m_MotionVectors: 1\n  m_LightProbeUsage: 1\n"
             "  m_ReflectionProbeUsage: 1\n  m_RayTracingMode: 0\n"
@@ -154,7 +174,7 @@ def sprite(sid, gid, guid, order, size, draw_mode, flip=0):
             "  m_SortingLayerID: 0\n  m_SortingLayer: 0\n"
             f"  m_SortingOrder: {order}\n"
             f"  m_Sprite: {{fileID: 21300000, guid: {guid}, type: 3}}\n"
-            "  m_Color: {r: 1, g: 1, b: 1, a: 1}\n"
+            f"  m_Color: {{r: {color}}}\n"
             f"  m_FlipX: {flip}\n  m_FlipY: 0\n"
             f"  m_DrawMode: {draw_mode}\n"
             f"  m_Size: {{x: {size[0]}, y: {size[1]}}}\n"
@@ -163,13 +183,24 @@ def sprite(sid, gid, guid, order, size, draw_mode, flip=0):
             "  m_SpriteSortPoint: 0\n")
 
 
-def box(cid, gid, offset, size):
+def box(cid, gid, offset, size, trigger=0):
     return (f"--- !u!61 &{cid}\nBoxCollider2D:\n" + COMMON_HEAD +
             f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
-            f"  m_Density: 1\n  m_Material: {{fileID: 0}}\n  m_IsTrigger: 0\n"
+            f"  m_Density: 1\n  m_Material: {{fileID: 0}}\n  m_IsTrigger: {trigger}\n"
             "  m_UsedByEffector: 0\n  m_UsedByComposite: 0\n"
             f"  m_Offset: {{x: {offset[0]}, y: {offset[1]}}}\n"
             f"  m_Size: {{x: {size[0]}, y: {size[1]}}}\n  m_EdgeRadius: 0\n")
+
+
+def kinematic_body(rid, gid):
+    # Rigidbody2D MovePosition требуется для движения коллайдера в физическом шаге.
+    return (f"--- !u!50 &{rid}\nRigidbody2D:\n" + COMMON_HEAD +
+            f"  m_GameObject: {{fileID: {gid}}}\n"
+            "  m_BodyType: 1\n  m_Simulated: 1\n  m_UseFullKinematicContacts: 0\n"
+            "  m_UseAutoMass: 0\n  m_Mass: 1\n  m_LinearDrag: 0\n"
+            "  m_AngularDrag: 0.05\n  m_GravityScale: 0\n"
+            "  m_Material: {fileID: 0}\n  m_Interpolate: 1\n"
+            "  m_SleepingMode: 1\n  m_CollisionDetection: 1\n  m_Constraints: 4\n")
 
 
 # --- проверка проходимости -------------------------------------------
@@ -203,8 +234,16 @@ def check():
             continue
         d, h = b[0] - a[1], b[2] - a[2]
         ok, (d0, d1) = reachable(d, h)
-        tag = 'прыжок' if h > 0.05 else ('спуск' if h < -0.05 else 'ровно')
-        note = f'{tag}, окно {d0:.2f}…{d1:.2f}' if ok else 'НЕДОСТИЖИМО'
+        if a[3] == 'Ground_Crest' and b[3] == 'Ground_Landing':
+            # Только этот провал намеренно длиннее обычного прыжка.
+            # Рывок в воздухе: 14 юн/с вместо 5 в течение 0.18 с,
+            # минимум +1.62 юн к дальности (пауза гравитации даёт ещё запас).
+            dash_extra = (14.0 - 5.0) * 0.18
+            ok = h == 0 and not ok and d1 < d <= d1 + dash_extra
+            note = f'прыжок + рывок (F), обычный максимум {d1:.2f}, с рывком ≥{d1 + dash_extra:.2f}'
+        else:
+            tag = 'прыжок' if h > 0.05 else ('спуск' if h < -0.05 else 'ровно')
+            note = f'{tag}, окно {d0:.2f}…{d1:.2f}' if ok else 'НЕДОСТИЖИМО'
         rows.append((ok, f'{a[3]} -> {b[3]}: пропасть {d:.2f}, '
                            f'перепад {h:+.2f}  ({note})'))
     for ok, msg in rows:
@@ -262,6 +301,8 @@ DECOR_ITEMS = [
     ('lily', 30.8, 0), ('campion', 32.0, 1),
     ('iris', 34.8, 1), ('lily', 36.2, 0),
     ('lily', 39.4, 0), ('campion', 40.2, 1), ('iris', 41.0, 0),
+    ('grass_tuft', 47.0, 1), ('lily', 48.0, 0),
+    ('spruce', 50.0, 0), ('iris', 51.0, 1),
 ]
 
 
@@ -304,7 +345,7 @@ def script(sid, gid, guid, extra):
             f"  m_GameObject: {{fileID: {gid}}}\n  m_Enabled: 1\n"
             "  m_EditorHideFlags: 0\n"
             f"  m_Script: {{fileID: 11500000, guid: {guid}, type: 3}}\n"
-            "  m_Name: \n  m_EditorClassIdentifier: \n" + extra)
+            "  m_Name:\n  m_EditorClassIdentifier:\n" + extra)
 
 
 def dummy(gid, name, x, top, health, order):
@@ -334,7 +375,7 @@ TREES = [
     ('cluster', -6.0, 0, 1.0), ('larch', -1.5, 0, 1.3), ('birch', 3.0, 1, 0.95),
     ('pillar', 9.0, 0, 0.95), ('larch', 14.0, 0, 1.1), ('cluster', 19.0, 1, 1.05),
     ('birch', 24.0, 0, 1.2), ('larch', 29.5, 1, 1.0), ('cluster', 34.0, 0, 1.15),
-    ('birch', 39.0, 0, 1.05), ('pillar', 43.0, 0, 0.85),
+    ('birch', 39.0, 0, 1.05), ('pillar', 49.0, 0, 0.85),
 ]
 
 
@@ -349,7 +390,7 @@ s = open(SCENE, encoding='utf-8').read()
 
 # --- вырезаем всё, что добавлял прошлый запуск ------------------------
 stripped = 0
-for prefix in ('21', '22', '23', '24', '25', '42', '43', '44', '45', '46', '47'):
+for prefix in ('21', '22', '23', '24', '25', '26', '27', '28', '29', '42', '43', '44', '45', '46', '47'):
     s, n = re.subn(r'--- !u!\d+ &' + prefix + r'\d+\n(?:(?!--- !u!).)*', '', s, flags=re.S)
     stripped += n
 
@@ -367,6 +408,19 @@ for i, (name, x0, x1, top) in enumerate(GROUND):
                       (w, GROUND_COLL)))
     order += 1
 
+# Тело высокого уступа не доходит до уровня низа соседней земли (спрайт
+# всего 2.93 юнита). Заполняем низ такой же почвой без второго коллайдера;
+# рисуем ПОЗАДИ верхней плиты, чтобы не получить вторую полоску травы.
+_, ledge_x0, ledge_x1, _ = next(g for g in GROUND if g[0] == 'Ground_Raised')
+fill_id = 260000000
+fill_width = round(ledge_x1 - ledge_x0, 4)
+blocks.append(gameobject(fill_id, 'Ground_Raised_Soil', [fill_id + 1, fill_id + 2], order))
+blocks.append(transform(fill_id + 1, fill_id,
+                        (round((ledge_x0 + ledge_x1) / 2, 4), GROUND_LIFT, 0), order))
+blocks.append(sprite(fill_id + 2, fill_id, GROUND_GUID, ORDER_CHASM,
+                     (fill_width, GROUND_H), 2))
+order += 1
+
 # --- платформы: спрайт по центру => transform y = низ + 0.5
 for i, (name, x0, x1, bottom) in enumerate(PLATFORMS):
     gid = 220000000 + i * 10
@@ -377,12 +431,43 @@ for i, (name, x0, x1, bottom) in enumerate(PLATFORMS):
     blocks.append(box(gid + 3, gid, (0, 0), (w, 1)))
     order += 1
 
+# --- особые платформы из тех же плит (центр спрайта = центр коллайдера)
+# Лифт в зазоре между ступенями 9.5…11 и 12…13.5: ходит вверх-вниз,
+# не пересекая неподвижные коллайдеры; исходный путь прыжками сохранён.
+gid = 270000000
+blocks.append(gameobject(gid, 'Platform_Moving',
+                         [gid + 1, gid + 2, gid + 3, gid + 4, gid + 5], order))
+blocks.append(transform(gid + 1, gid, (11.5, -0.15, 0), order))
+blocks.append(sprite(gid + 2, gid, BLOCK_GUID, ORDER_PLATFORM, (0.9, 1), 2,
+                     color='0.7, g: 0.88, b: 1, a: 1'))
+blocks.append(box(gid + 3, gid, (0, 0), (0.9, 1)))
+blocks.append(kinematic_body(gid + 4, gid))
+blocks.append(script(gid + 5, gid, MOVING_GUID,
+                     '  offset: {x: 0, y: 0.9}\n  travelTime: 1.6\n'))
+order += 1
+
+# Хрупкая плита над коротким разрывом перед Ground_Ledge1. Можно прыгнуть
+# и мимо неё; после касания исчезает на 3 секунды и даёт повторить попытку.
+gid = 271000000
+blocks.append(gameobject(gid, 'Platform_Crumbling',
+                         [gid + 1, gid + 2, gid + 3, gid + 4], order))
+blocks.append(transform(gid + 1, gid, (-18.25, 0.8, 0), order))
+blocks.append(sprite(gid + 2, gid, BLOCK_GUID, ORDER_PLATFORM, (1.0, 1), 2,
+                     color='1, g: 0.75, b: 0.7, a: 1'))
+blocks.append(box(gid + 3, gid, (0, 0), (1.0, 1)))
+blocks.append(script(gid + 4, gid, CRUMBLING_GUID,
+                     '  collapseDelay: 0.35\n  respawnDelay: 3\n'))
+order += 1
+
 # --- провалы: тёмная бездна за каждым разрывом в земле
 gaps = []
-for i in range(len(GROUND) - 1):
-    a, b = GROUND[i], GROUND[i + 1]
+# Новые участки добавлены в конец GROUND ради стабильных fileID; для
+# поиска реальных разрывов отсортируем их по координате.
+ordered_ground = sorted(GROUND, key=lambda segment: segment[1])
+for i in range(len(ordered_ground) - 1):
+    a, b = ordered_ground[i], ordered_ground[i + 1]
     if b[1] > a[2]:
-        gaps.append((f'Chasm_{i + 1}', a[2], b[1]))
+        gaps.append((f'Chasm_{len(gaps) + 1}', a[2], b[1]))
 for i, (name, x0, x1) in enumerate(gaps):
     gid = 230000000 + i * 10
     w, cx = round(x1 - x0, 4), round((x0 + x1) / 2, 4)
@@ -390,6 +475,53 @@ for i, (name, x0, x1) in enumerate(gaps):
     blocks.append(transform(gid + 1, gid, (cx, -CHASM_DEPTH / 2, 0), order))
     blocks.append(sprite(gid + 2, gid, CHASM_GUID, ORDER_CHASM, (w, CHASM_DEPTH), 0))
     order += 1
+
+# --- корни: статичный фон в тёмном провале 8.5…14.5 под ступенями.
+# Пивот по центру, спрайт 1024 / PPU 256 = 4x4 юнита; целиком внутри
+# провала (x 9.5…13.5, y -5.5…-1.5). Без коллайдера и скрипта: только декор.
+gid = 280000000
+blocks.append(gameobject(gid, 'Underground_TreeRoots', [gid + 1, gid + 2], order))
+blocks.append(transform(gid + 1, gid, (11.5, -3.5, 0.2), order))
+blocks.append(sprite(gid + 2, gid, ROOTS_GUID, ORDER_UNDERGROUND, (4, 4), 0,
+                     color='0.78, g: 0.72, b: 0.66, a: 0.83'))
+order += 1
+
+# --- секрет у края провала 8.5…14.5 --------------------------------
+# Ложная земляная стенка накрывает вход. Коллайдер-триггер не препятствует
+# проходу: при касании героиней стенка исчезает и открывает кристалл.
+# За краем есть небольшой опорный уступ (верх -0.7); с него можно
+# подпрыгнуть обратно на Ground_Low (верх 0) обычным прыжком.
+gid = 290000000
+blocks.append(gameobject(gid, 'Secret_FalseWall',
+                         [gid + 1, gid + 2, gid + 3, gid + 4], order))
+blocks.append(transform(gid + 1, gid, (8.3, 1.2, 0), order))
+blocks.append(sprite(gid + 2, gid, GROUND_GUID, ORDER_SECRET_WALL,
+                     (1.2, GROUND_H), 2, color='0.68, g: 0.64, b: 0.63, a: 1'))
+blocks.append(box(gid + 3, gid, (0, -GROUND_H / 2), (1.2, GROUND_H), trigger=1))
+blocks.append(script(gid + 4, gid, SECRET_GUID,
+                     '  hiddenTreasure: {fileID: 292000002}\n'))
+order += 1
+
+gid = 291000000
+blocks.append(gameobject(gid, 'Secret_Shelf', [gid + 1, gid + 2, gid + 3], order))
+blocks.append(transform(gid + 1, gid, (8.975, -1.2, 0), order))
+blocks.append(sprite(gid + 2, gid, BLOCK_GUID, ORDER_PLATFORM, (0.95, 1), 2,
+                     color='0.6, g: 0.65, b: 0.7, a: 1'))
+blocks.append(box(gid + 3, gid, (0, 0), (0.95, 1)))
+order += 1
+
+gid = 292000000
+blocks.append(gameobject(gid, 'Secret_Crystal',
+                         [gid + 1, gid + 2, gid + 3, gid + 4], order))
+blocks.append(transform(gid + 1, gid, (9.1, -0.15, 0), order))
+blocks.append(sprite(gid + 2, gid, CRYSTAL_GUID, ORDER_COLLECTIBLE, (1, 1), 0,
+                     enabled=0))
+# Верх триггера у y=0: с обычной земли подбирать нельзя — нужно зайти
+# за стенку и спуститься на Secret_Shelf (верх -0.7).
+blocks.append(box(gid + 3, gid, (0, -0.15), (0.55, 0.6), trigger=1))
+blocks.append(script(gid + 4, gid, PICKUP_GUID,
+                     '  passage: {fileID: 290000004}\n'))
+order += 1
 
 # --- декор: пивот низ-центр => transform y = высота поверхности
 placed = 0
