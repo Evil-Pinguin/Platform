@@ -174,6 +174,12 @@ public class GachaSystem : MonoBehaviour
         return name == mainHeroine || Resources.Load<Sprite>("Playable/" + name + "/idle_front") != null;
     }
 
+    // Монстры не нападают на мирных персонажей — пока такая только Хаара
+    public static bool MonstersIgnoreHero
+    {
+        get { return instance != null && instance.activeCharacter == "Хаара"; }
+    }
+
     static Sprite[] LoadFrames(string name, string prefix)
     {
         var list = new List<Sprite>();

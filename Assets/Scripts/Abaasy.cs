@@ -110,7 +110,8 @@ public class Abaasy : MonoBehaviour
         body = GetComponent<Rigidbody2D>();
         rend = GetComponent<SpriteRenderer>();
         box = GetComponent<BoxCollider2D>();
-        if (target == null) target = FindObjectOfType<PlayerController>();
+        if (target == null && !GachaSystem.MonstersIgnoreHero)
+            target = FindObjectOfType<PlayerController>();
     }
 
     void Update()
@@ -121,7 +122,11 @@ public class Abaasy : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (body == null || target == null) return;
+        // Мирный персонаж (Хаара) — монстр теряет цель: стоит на месте и не дышит огнём
+        if (GachaSystem.MonstersIgnoreHero) { target = null; return; }
+        if (body == null) return;
+        if (target == null) target = FindObjectOfType<PlayerController>();
+        if (target == null) return;
 
         Vector2 self = transform.position;
         Vector2 pl = target.transform.position;
@@ -277,6 +282,9 @@ public class AbaasyFlame : MonoBehaviour
     static PlayerController cachedTarget;
     static PlayerController FindTarget()
     {
+        // Мирный персонаж (Хаара) — монстры её не замечают:
+        // нет цели → нет погони и дыхания, а уже летящее пламя её не задевает
+        if (GachaSystem.MonstersIgnoreHero) return null;
         if (cachedTarget == null) cachedTarget = FindObjectOfType<PlayerController>();
         return cachedTarget;
     }
