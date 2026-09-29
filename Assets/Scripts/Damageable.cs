@@ -68,8 +68,15 @@ public class Damageable : MonoBehaviour
             body.velocity = dir * knockback;
         }
 
-        if (health <= 0 && vanishOnDeath)
-            Destroy(gameObject);
+        if (health <= 0)
+        {
+            // Уничтожение объекта приносит алмазы (5 шт. — см. GachaSystem.destroyReward).
+            // Персонаж (PlayerController) награду не приносит, только объекты.
+            if (guard == null)
+                GachaSystem.RewardDestroy(transform.position);
+            if (vanishOnDeath)
+                Destroy(gameObject);
+        }
     }
 
     IEnumerator RecoverColor()
